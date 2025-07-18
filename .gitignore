@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+MNIST/
+mnist/
+data/
+*.gz
+*.pth
+*.pt
+.DS_Store
+.env

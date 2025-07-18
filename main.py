@@ -1,179 +1,129 @@
-"""
-STUDIO SULLA STABILITÀ DELLE SPIEGAZIONI NEL RASHOMON SET
-
-L'obiettivo è:
-1. Costruire un Rashomon Set di modelli con prestazioni equivalenti
-2. Generare spiegazioni con diversi algoritmi (Grad-CAM, LIME, SHAP)
-3. Valutare la similarità tra spiegazioni con 5 metriche diverse
-4. Quantificare la qualità delle spiegazioni con le curve MoRF
-5. Analizzare la relazione tra similarità e qualità delle spiegazioni
-
-"""
-
-#1. IMPORTAZIONE LIBRERIE
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader, random_split, Subset
 import numpy as np
-import matplotlib.pyplot as plt
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
-from tensorflow.keras.callbacks import EarlyStopping
-from sklearn.model_selection import train_test_split
-from skimage.metrics import structural_similarity as ssim
-from scipy.stats import pearsonr, spearmanr
-import lime
-from lime import lime_image
-import shap
+import random
 from tqdm import tqdm
-from itertools import combinations
-import time
 
-#2. PARAMETRI GLOBALI
-# Configurazione sperimentale
+# PARAMETRI
 SEED = 42
 np.random.seed(SEED)
-tf.random.set_seed(SEED)
+torch.manual_seed(SEED)
+random.seed(SEED)
 
-# Parametri dataset
-DATASET = "cifar10"
-NUM_CLASSES = 10
-IMG_SIZE = (32, 32, 3)
-
-# Parametri modello
-MODEL_CONFIG = [
-    Conv2D(32, (3,3), activation='relu', input_shape=IMG_SIZE),
-    MaxPooling2D((2,2)),
-    Conv2D(64, (3,3), activation='relu'),
-    MaxPooling2D((2,2)),
-    Flatten(),
-    Dense(128, activation='relu'),
-    Dense(NUM_CLASSES, activation='softmax')
-]
-
-# Parametri training
-EPOCHS = 50
+NUM_MODELS = 10          # Numero modelli iniziali da addestrare
+RASHOMON_THRESH = 0.01   # Soglia (es: 1%) per selezione Rashomon set
+EPOCHS = 30
 BATCH_SIZE = 64
-RASHOMON_THRESHOLD = 0.01  # Soglia 1% per Rashomon Set
-INIT_MODELS = 10           # Modelli iniziali da addestrare
+PATIENCE = 5             # Early stopping patience
 
-# Parametri spiegazioni
-EXPL_METHODS = ['gradcam', 'lime', 'shap']
-SAMPLE_IMAGES = 5          # Immagini campione per analisi
+# DATASET 
+transform = transforms.Compose([transforms.ToTensor()])
+mnist_train = datasets.MNIST('.', train=True, download=True, transform=transform)
+mnist_test = datasets.MNIST('.', train=False, download=True, transform=transform)
 
-# Parametri similarità
-SIM_METRICS = ['SSIM', 'Pearson', 'Spearman', 'Cosine', 'MAE']
+# Split: train 80%, val 20% del train originale
+train_size = int(0.8 * len(mnist_train))
+val_size = len(mnist_train) - train_size
+train_dataset, val_dataset = random_split(mnist_train, [train_size, val_size])
+train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
+test_loader = DataLoader(mnist_test, batch_size=BATCH_SIZE)
 
-# 3. PREPARAZIONE DATI
-print(f"\n{'='*50}")
-print(f"{'PREPARAZIONE DATASET':^50}")
-print(f"{'='*50}")
+# MODELLO 
+class SimpleCNN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv1 = nn.Conv2d(1, 32, 3, padding=1)
+        self.relu = nn.ReLU()
+        self.pool = nn.MaxPool2d(2)
+        self.conv2 = nn.Conv2d(32, 64, 3, padding=1)
+        self.fc1 = nn.Linear(64*7*7, 128)
+        self.fc2 = nn.Linear(128, 10)
 
-def load_and_preprocess_data():
-    """Carica e preprocessa il dataset"""
-    # Caricamento dataset
-    if DATASET == "cifar10":
-        (X_train, y_train), (X_test, y_test) = tf.keras.datasets.cifar10.load_data()
+    def forward(self, x):
+        x = self.relu(self.conv1(x))
+        x = self.pool(x)
+        x = self.relu(self.conv2(x))
+        x = self.pool(x)
+        x = x.view(x.size(0), -1)
+        x = self.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+
+# TRAINING + EARLY STOPPING 
+def train_one_model(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    model = SimpleCNN()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    criterion = nn.CrossEntropyLoss()
+
+    best_val_acc = 0.0
+    patience_counter = 0
+    best_weights = None
+
+    for epoch in range(EPOCHS):
+        # Training
+        model.train()
+        for data, target in train_loader:
+            optimizer.zero_grad()
+            output = model(data)
+            loss = criterion(output, target)
+            loss.backward()
+            optimizer.step()
+        # Validation
+        model.eval()
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for data, target in val_loader:
+                output = model(data)
+                pred = output.argmax(dim=1)
+                correct += (pred == target).sum().item()
+                total += target.size(0)
+        val_acc = correct / total
+
+        # Early stopping
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            best_weights = model.state_dict()
+            patience_counter = 0
+        else:
+            patience_counter += 1
+            if patience_counter >= PATIENCE:
+                break
+    # Carica i pesi migliori
+    model.load_state_dict(best_weights)
+    return model, best_val_acc
+
+# ADDDESTRAMENTO  
+all_models = []
+all_val_acc = []
+
+print("Training modelli (con early stopping) per Rashomon set...")
+for i in tqdm(range(NUM_MODELS)):
+    seed = SEED + i  # seed diverso per ogni modello
+    model, val_acc = train_one_model(seed)
+    all_models.append(model)
+    all_val_acc.append(val_acc)
+    print(f"Modello {i}: Val accuracy={val_acc:.4f}")
+
+# ======= SELEZIONE RASHOMON =========
+best_acc = max(all_val_acc)
+rashomon_threshold = best_acc - RASHOMON_THRESH
+
+rashomon_models = []
+for i, (model, acc) in enumerate(zip(all_models, all_val_acc)):
+    if acc >= rashomon_threshold:
+        print(f"[✓] Modello {i} selezionato (val acc={acc:.4f})")
+        rashomon_models.append(model)
     else:
-        raise ValueError(f"Dataset non supportato: {DATASET}")
-    
-    # Normalizzazione [0,1]
-    X_train = X_train.astype('float32') / 255.0
-    X_test = X_test.astype('float32') / 255.0
-    
-    # Suddivisione validation set (10% del test)
-    X_val, X_test, y_val, y_test = train_test_split(
-        X_test, y_test, 
-        test_size=0.9, 
-        random_state=SEED
-    )
-    
-    print(f"- Dimensione dataset:")
-    print(f"  Training:   {X_train.shape[0]} immagini")
-    print(f"  Validation: {X_val.shape[0]} immagini")
-    print(f"  Test:       {X_test.shape[0]} immagini")
-    
-    return X_train, y_train, X_val, y_val, X_test, y_test
+        print(f"[ ] Modello {i} scartato (val acc={acc:.4f})")
 
-# Caricamento dati
-X_train, y_train, X_val, y_val, X_test, y_test = load_and_preprocess_data()
-
-# Selezione immagini campione
-sample_indices = np.random.choice(len(X_test), SAMPLE_IMAGES, replace=False)
-X_sample = X_test[sample_indices]
-y_sample = y_test[sample_indices]
-
-# 4. DEFINIZIONE MODELLO
-def build_model():
-    """Costruisce il modello CNN"""
-    model = Sequential(MODEL_CONFIG)
-    model.compile(
-        optimizer='adam', # Adaptive Moment Estimation
-        loss='sparse_categorical_crossentropy',
-        metrics=['accuracy']
-    )
-    return model
-
-# Visualizzazione architettura
-print(f"\n{'='*50}")
-print(f"{'ARCHITETTURA MODELLO':^50}")
-print(f"{'='*50}")
-model = build_model()
-model.summary()
-
-# 5. COSTRUZIONE RASHOMON SET
-print(f"\n{'='*50}")
-print(f"{'COSTRUZIONE RASHOMON SET':^50}")
-print(f"{'='*50}")
-
-def train_rashomon_models():
-    """Addestra modelli e seleziona Rashomon Set"""
-    # Configurazione early stopping
-    early_stopping = EarlyStopping(
-        monitor='val_accuracy',
-        patience=10,
-        restore_best_weights=True,
-        mode='max',
-        verbose=0
-    )
-    
-    all_models = []
-    all_val_acc = []
-    
-    print(f"Addestramento di {INIT_MODELS} modelli con early stopping...")
-    for i in tqdm(range(INIT_MODELS)):
-        # Costruzione e addestramento modello
-        model = build_model()
-        history = model.fit(
-            X_train, y_train,
-            epochs=EPOCHS,
-            batch_size=BATCH_SIZE,
-            validation_data=(X_val, y_val),
-            callbacks=[early_stopping],
-            verbose=0
-        )
-        
-        # Registrazione risultati
-        best_val_acc = max(history.history['val_accuracy'])
-        all_val_acc.append(best_val_acc)
-        all_models.append(model)
-    
-    # Determinazione soglia Rashomon
-    global_best_acc = max(all_val_acc)
-    rashomon_threshold = global_best_acc - RASHOMON_THRESHOLD
-    
-    # Selezione modelli Rashomon
-    rashomon_models = []
-    for model, acc in zip(all_models, all_val_acc):
-        if acc >= rashomon_threshold:
-            model.id = f"Model_{len(rashomon_models)+1}"
-            rashomon_models.append(model)
-    
-    print("\n- Risultati selezione Rashomon:")
-    print(f"  Migliore accuracy: {global_best_acc:.4f}")
-    print(f"  Soglia: {rashomon_threshold:.4f}")
-    print(f"  Modelli selezionati: {len(rashomon_models)}/{INIT_MODELS}")
-    print(f"  Range accuracy: {min(all_val_acc):.4f} - {global_best_acc:.4f}")
-    
-    return rashomon_models, global_best_acc
-
-# Addestramento modelli
-rashomon_models, best_acc = train_rashomon_models()
+print(f"\nMigliore accuracy: {best_acc:.4f}")
+print(f"Soglia Rashomon: {rashomon_threshold:.4f}")
+print(f"Modelli Rashomon selezionati: {len(rashomon_models)}/{NUM_MODELS}")
