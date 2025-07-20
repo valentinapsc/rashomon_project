@@ -7,6 +7,11 @@ import numpy as np
 import random
 from tqdm import tqdm
 
+from captum.attr import Saliency, IntegratedGradients
+
+from skimage.metrics import structural_similarity as ssim
+from scipy.stats import pearsonr, spearmanr
+
 # PARAMETRI
 SEED = 42
 np.random.seed(SEED)
@@ -112,7 +117,7 @@ for i in tqdm(range(NUM_MODELS)):
     all_val_acc.append(val_acc)
     print(f"Modello {i}: Val accuracy={val_acc:.4f}")
 
-# ======= SELEZIONE RASHOMON =========
+# SELEZIONE RASHOMON 
 best_acc = max(all_val_acc)
 rashomon_threshold = best_acc - RASHOMON_THRESH
 
@@ -127,3 +132,69 @@ for i, (model, acc) in enumerate(zip(all_models, all_val_acc)):
 print(f"\nMigliore accuracy: {best_acc:.4f}")
 print(f"Soglia Rashomon: {rashomon_threshold:.4f}")
 print(f"Modelli Rashomon selezionati: {len(rashomon_models)}/{NUM_MODELS}")
+
+# GENERAZIONE SPIEGAZIONI
+print("\n" + "="*50)
+print("Generazione Spiegazioni")
+print("="*50)
+
+# Parametri spiegazioni
+EXPL_METHODS = ['saliency', 'ig']
+
+def generate_saliency(model, sample, label):
+    explainer = Saliency(model)
+    attr = explainer.attribute(sample, target=label)
+    arr = attr.squeeze().detach().cpu().numpy()
+    # Normalizza [0,1] per confronto/visualizzazione
+    arr = (arr - arr.min()) / (arr.max() - arr.min() + 1e-8)
+    return arr
+
+def generate_ig(model, sample, label):
+    explainer = IntegratedGradients(model)
+    attr = explainer.attribute(sample, target=label, baselines=torch.zeros_like(sample))
+    arr = attr.squeeze().detach().cpu().numpy()
+    arr = (arr - arr.min()) / (arr.max() - arr.min() + 1e-8)
+    return arr
+
+def generate_explanations(model, sample, label):
+    explanations = {}
+    if 'saliency' in EXPL_METHODS:
+        explanations['saliency'] = generate_saliency(model, sample, label)
+    if 'ig' in EXPL_METHODS:
+        explanations['ig'] = generate_ig(model, sample, label)
+    # Puoi aggiungere altri metodi qui...
+    return explanations
+
+# Esempio di utilizzo sul Rashomon set
+
+SAMPLE_SIZE = 5
+# Scegli immagini casuali dal test set
+sample_indices = np.random.choice(len(mnist_test), SAMPLE_SIZE, replace=False)
+sample_imgs = torch.stack([mnist_test[i][0] for i in sample_indices])
+sample_labels = torch.tensor([mnist_test[i][1] for i in sample_indices])
+
+device = torch.device("cpu")
+
+# Struttura per risultati
+explanations_all = []
+
+for model_idx, model in enumerate(rashomon_models):
+    model.eval()
+    model.to(device)
+    model_results = []
+    print(f"\nGenerazione spiegazioni per il modello {model_idx+1}/{len(rashomon_models)}")
+    for img_idx in range(SAMPLE_SIZE):
+        sample = sample_imgs[img_idx].unsqueeze(0).to(device)  # [1, 1, 28, 28]
+        label = sample_labels[img_idx].item()
+        exp = generate_explanations(model, sample, label)
+        model_results.append({
+            'img_index': int(sample_indices[img_idx]),
+            'true_label': int(label),
+            'explanations': exp
+        })
+        print(f"  Img {img_idx}: spiegazioni generate ({', '.join(exp.keys())})")
+    explanations_all.append({
+        'model_id': model_idx,
+        'model_seed': SEED + model_idx,
+        'explanations': model_results
+    })
