@@ -7,10 +7,12 @@ import numpy as np
 import random
 from tqdm import tqdm
 
-from captum.attr import Saliency, IntegratedGradients
+from captum.attr import Saliency, IntegratedGradients, Lime
 
 from skimage.metrics import structural_similarity as ssim
-from scipy.stats import pearsonr, spearmanr
+# from scipy.stats import pearsonr, spearmanr
+
+import matplotlib.pyplot as plt
 
 # PARAMETRI
 SEED = 42
@@ -18,11 +20,11 @@ np.random.seed(SEED)
 torch.manual_seed(SEED)
 random.seed(SEED)
 
-NUM_MODELS = 10          # Numero modelli iniziali da addestrare
+NUM_MODELS = 5          # Numero modelli iniziali da addestrare
 RASHOMON_THRESH = 0.01   # Soglia (es: 1%) per selezione Rashomon set
 EPOCHS = 30
 BATCH_SIZE = 64
-PATIENCE = 5             # Early stopping patience
+PATIENCE = 3             # Early stopping patience
 
 # DATASET 
 transform = transforms.Compose([transforms.ToTensor()])
@@ -80,6 +82,7 @@ def train_one_model(seed):
             loss = criterion(output, target)
             loss.backward()
             optimizer.step()
+            
         # Validation
         model.eval()
         correct = 0
@@ -139,7 +142,7 @@ print("Generazione Spiegazioni")
 print("="*50)
 
 # Parametri spiegazioni
-EXPL_METHODS = ['saliency', 'ig']
+EXPL_METHODS = ['saliency', 'ig', 'lime']
 
 def generate_saliency(model, sample, label):
     explainer = Saliency(model)
@@ -156,18 +159,28 @@ def generate_ig(model, sample, label):
     arr = (arr - arr.min()) / (arr.max() - arr.min() + 1e-8)
     return arr
 
+def generate_lime(model, sample, label):
+    explainer = Lime(model,
+                     feature_selection='highest_weights',
+                     discretize_continuous=False,
+                     kernel_width=0.25)
+    attr = explainer.attribute(sample, target=label, n_samples=50)
+    arr = attr.squeeze().cpu().detach().numpy()
+    return (arr - arr.min())/(arr.max()-arr.min()+1e-8)
+
 def generate_explanations(model, sample, label):
     explanations = {}
     if 'saliency' in EXPL_METHODS:
         explanations['saliency'] = generate_saliency(model, sample, label)
     if 'ig' in EXPL_METHODS:
         explanations['ig'] = generate_ig(model, sample, label)
-    # Puoi aggiungere altri metodi qui...
+    if 'lime' in EXPL_METHODS:
+        explanations['lime'] = generate_lime(model, sample, label)    
     return explanations
 
 # Esempio di utilizzo sul Rashomon set
 
-SAMPLE_SIZE = 5
+SAMPLE_SIZE = 100
 # Scegli immagini casuali dal test set
 sample_indices = np.random.choice(len(mnist_test), SAMPLE_SIZE, replace=False)
 sample_imgs = torch.stack([mnist_test[i][0] for i in sample_indices])
@@ -198,3 +211,31 @@ for model_idx, model in enumerate(rashomon_models):
         'model_seed': SEED + model_idx,
         'explanations': model_results
     })
+    
+'''
+def plot_explanations(explanations_all, sample_imgs, sample_labels, methods=['saliency', 'ig', 'lime']):
+    num_models = len(explanations_all)
+    num_imgs = len(sample_imgs)
+    for img_idx in range(num_imgs):
+        plt.figure(figsize=(3 + 2*len(methods)*num_models, 3))
+        # Mostra l’immagine originale a sinistra
+        plt.subplot(1, 1 + num_models*len(methods), 1)
+        plt.imshow(sample_imgs[img_idx][0], cmap='gray')
+        plt.axis('off')
+        plt.title(f"Original\nLabel: {sample_labels[img_idx].item()}")
+        # Ora mostra le heatmap per ogni modello e metodo
+        plot_idx = 2
+        for model_info in explanations_all:
+            for method in methods:
+                heatmap = model_info['explanations'][img_idx]['explanations'][method]
+                plt.subplot(1, 1 + num_models*len(methods), plot_idx)
+                plt.imshow(heatmap, cmap='hot')
+                plt.axis('off')
+                plt.title(f"Model {model_info['model_id']+1}\n{method.capitalize()}")
+                plot_idx += 1
+        plt.tight_layout()
+        plt.show()
+
+plot_explanations(explanations_all, sample_imgs, sample_labels, methods=EXPL_METHODS)
+'''
+
