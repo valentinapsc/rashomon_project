@@ -6,11 +6,14 @@ from torch.utils.data import DataLoader, random_split, Subset
 import numpy as np
 import random
 from tqdm import tqdm
+import os
+import glob
 
 from captum.attr import Saliency, IntegratedGradients, Lime
 
 from skimage.metrics import structural_similarity as ssim
-# from scipy.stats import pearsonr, spearmanr
+from scipy.stats import pearsonr, spearmanr
+from itertools import combinations
 
 import matplotlib.pyplot as plt
 
@@ -20,11 +23,14 @@ np.random.seed(SEED)
 torch.manual_seed(SEED)
 random.seed(SEED)
 
-NUM_MODELS = 5          # Numero modelli iniziali da addestrare
-RASHOMON_THRESH = 0.01   # Soglia (es: 1%) per selezione Rashomon set
+NUM_MODELS = 10          # Numero modelli iniziali da addestrare
+RASHOMON_THRESH = 0.01   # Soglia (1%) per selezione Rashomon set
 EPOCHS = 30
 BATCH_SIZE = 64
 PATIENCE = 3             # Early stopping patience
+
+SAVE_DIR = "rashomon_models"
+os.makedirs(SAVE_DIR, exist_ok=True)
 
 # DATASET 
 transform = transforms.Compose([transforms.ToTensor()])
@@ -108,33 +114,45 @@ def train_one_model(seed):
     model.load_state_dict(best_weights)
     return model, best_val_acc
 
-# ADDDESTRAMENTO  
-all_models = []
+# CARICAMENTO O TRAIN 
+rashomon_models = []
 all_val_acc = []
 
-print("Training modelli (con early stopping) per Rashomon set...")
-for i in tqdm(range(NUM_MODELS)):
-    seed = SEED + i  # seed diverso per ogni modello
-    model, val_acc = train_one_model(seed)
-    all_models.append(model)
-    all_val_acc.append(val_acc)
-    print(f"Modello {i}: Val accuracy={val_acc:.4f}")
+# prova a caricare modelli già salvati
+model_files = sorted(glob.glob(os.path.join(SAVE_DIR, "rashomon_model_*.pt")))
 
-# SELEZIONE RASHOMON 
-best_acc = max(all_val_acc)
-rashomon_threshold = best_acc - RASHOMON_THRESH
-
-rashomon_models = []
-for i, (model, acc) in enumerate(zip(all_models, all_val_acc)):
-    if acc >= rashomon_threshold:
-        print(f"[✓] Modello {i} selezionato (val acc={acc:.4f})")
+if len(model_files) > 0:
+    print("Caricamento modelli Rashomon dal disco...")
+    for model_path in model_files:
+        model = SimpleCNN()
+        model.load_state_dict(torch.load(model_path, map_location='cpu'))
+        model.eval()
         rashomon_models.append(model)
-    else:
-        print(f"[ ] Modello {i} scartato (val acc={acc:.4f})")
-
-print(f"\nMigliore accuracy: {best_acc:.4f}")
-print(f"Soglia Rashomon: {rashomon_threshold:.4f}")
-print(f"Modelli Rashomon selezionati: {len(rashomon_models)}/{NUM_MODELS}")
+    print(f"Modelli Rashomon caricati: {len(rashomon_models)}")
+else:
+    print("Training modelli (con early stopping) per Rashomon set...")
+    temp_models = []
+    temp_accs = []
+    for i in tqdm(range(NUM_MODELS)):
+        seed = SEED + i
+        model, val_acc = train_one_model(seed)
+        temp_models.append(model)
+        temp_accs.append(val_acc)
+        print(f"Modello {i}: Val accuracy={val_acc:.4f}")
+    best_acc = max(temp_accs)
+    rashomon_threshold = best_acc - RASHOMON_THRESH
+    for i, (model, acc) in enumerate(zip(temp_models, temp_accs)):
+        if acc >= rashomon_threshold:
+            print(f"[✓] Modello {i} selezionato (val acc={acc:.4f})")
+            rashomon_models.append(model)
+            # salva il modello Rashomon su disco
+            model_path = os.path.join(SAVE_DIR, f"rashomon_model_{i}.pt")
+            torch.save(model.state_dict(), model_path)
+        else:
+            print(f"[ ] Modello {i} scartato (val acc={acc:.4f})")
+    print(f"\nMigliore accuracy: {best_acc:.4f}")
+    print(f"Soglia Rashomon: {rashomon_threshold:.4f}")
+    print(f"Modelli Rashomon selezionati: {len(rashomon_models)}/{NUM_MODELS}")
 
 # GENERAZIONE SPIEGAZIONI
 print("\n" + "="*50)
@@ -148,7 +166,7 @@ def generate_saliency(model, sample, label):
     explainer = Saliency(model)
     attr = explainer.attribute(sample, target=label)
     arr = attr.squeeze().detach().cpu().numpy()
-    # Normalizza [0,1] per confronto/visualizzazione
+    # normalizza [0,1] per confronto/visualizzazione
     arr = (arr - arr.min()) / (arr.max() - arr.min() + 1e-8)
     return arr
 
@@ -159,14 +177,13 @@ def generate_ig(model, sample, label):
     arr = (arr - arr.min()) / (arr.max() - arr.min() + 1e-8)
     return arr
 
+# esempio di “XAI model-agnostic”
 def generate_lime(model, sample, label):
-    explainer = Lime(model,
-                     feature_selection='highest_weights',
-                     discretize_continuous=False,
-                     kernel_width=0.25)
-    attr = explainer.attribute(sample, target=label, n_samples=50)
+    explainer = Lime(model)
+    attr = explainer.attribute(sample, target=label, n_samples=100)
     arr = attr.squeeze().cpu().detach().numpy()
-    return (arr - arr.min())/(arr.max()-arr.min()+1e-8)
+    arr = (arr - arr.min()) / (arr.max() - arr.min() + 1e-8)
+    return arr
 
 def generate_explanations(model, sample, label):
     explanations = {}
@@ -180,8 +197,8 @@ def generate_explanations(model, sample, label):
 
 # Esempio di utilizzo sul Rashomon set
 
-SAMPLE_SIZE = 100
-# Scegli immagini casuali dal test set
+SAMPLE_SIZE = 10
+# scegli immagini casuali dal test set
 sample_indices = np.random.choice(len(mnist_test), SAMPLE_SIZE, replace=False)
 sample_imgs = torch.stack([mnist_test[i][0] for i in sample_indices])
 sample_labels = torch.tensor([mnist_test[i][1] for i in sample_indices])
@@ -212,30 +229,116 @@ for model_idx, model in enumerate(rashomon_models):
         'explanations': model_results
     })
     
-'''
-def plot_explanations(explanations_all, sample_imgs, sample_labels, methods=['saliency', 'ig', 'lime']):
+# MISURE DI SIMILARITÀ 
+SIM_METRICS = ['SSIM', 'Pearson', 'Spearman', 'Cosine', 'MAE']
+
+def calculate_similarity(exp1, exp2):
+    # Normalizza le spiegazioni
+    exp1_norm = (exp1 - np.min(exp1)) / (np.max(exp1) - np.min(exp1) + 1e-10)
+    exp2_norm = (exp2 - np.min(exp2)) / (np.max(exp2) - np.min(exp2) + 1e-10)
+    # Appiattisci
+    flat1 = exp1_norm.flatten()
+    flat2 = exp2_norm.flatten()
+    # 1. SSIM
+    ssim_val = ssim(exp1_norm, exp2_norm, data_range=1.0)
+    # 2. Pearson
+    pearson_val, _ = pearsonr(flat1, flat2)
+    # 3. Spearman
+    spearman_val, _ = spearmanr(flat1, flat2)
+    # 4. Cosine
+    cosine_val = np.dot(flat1, flat2) / (np.linalg.norm(flat1) * np.linalg.norm(flat2) + 1e-10)
+    # 5. MAE
+    mae_val = np.mean(np.abs(exp1_norm - exp2_norm))
+    return [ssim_val, pearson_val, spearman_val, cosine_val, mae_val]
+
+all_explanations = {}
+for model in explanations_all:
+    all_explanations[model['model_id']] = [
+        exp['explanations'] for exp in model['explanations']
+    ]
+    
+print("\n" + "="*50)
+print("Calcolo similarità tra spiegazioni")
+print("="*50)
+
+similarity_results = {m: {'same_model': [], 'diff_model': []} for m in EXPL_METHODS}
+for m1, m2 in combinations(EXPL_METHODS, 2):
+    similarity_results[f"{m1}-{m2}"] = {'same_model': []}
+
+# Per ogni immagine del campione
+for img_idx in tqdm(range(SAMPLE_SIZE)):
+    # Intra-modello (confronta metodi diversi sullo stesso modello)
+    for model_id, model_exps in all_explanations.items():
+        methods = list(model_exps[img_idx].keys())
+        for m1, m2 in combinations(methods, 2):
+            sim_vals = calculate_similarity(
+                model_exps[img_idx][m1], 
+                model_exps[img_idx][m2]
+            )
+            for i, metric in enumerate(SIM_METRICS):
+                similarity_results[f"{m1}-{m2}"]['same_model'].append(sim_vals[i])
+    
+    # Inter-modello (confronta lo stesso metodo tra modelli diversi)
+    for method in EXPL_METHODS:
+        model_exps = [all_explanations[model_id][img_idx][method] for model_id in all_explanations]
+        for exp1, exp2 in combinations(model_exps, 2):
+            sim_vals = calculate_similarity(exp1, exp2)
+            for i, metric in enumerate(SIM_METRICS):
+                similarity_results[method]['diff_model'].append(sim_vals[i])
+                
+# Stampa risultati medi
+print("\nRisultati medi similarità INTRA-modello (tra metodi, stesso modello):")
+for key in similarity_results:
+    if 'same_model' in similarity_results[key]:
+        means = [np.mean(similarity_results[key]['same_model']) for _ in SIM_METRICS]
+        print(f"{key}: {dict(zip(SIM_METRICS, [f'{m:.3f}' for m in means]))}")
+
+print("\nRisultati medi similarità INTER-modello (stesso metodo, modelli diversi):")
+for method in EXPL_METHODS:
+    means = [np.mean(similarity_results[method]['diff_model']) for _ in SIM_METRICS]
+    print(f"{method}: {dict(zip(SIM_METRICS, [f'{m:.3f}' for m in means]))}")
+
+
+
+# VISUALIZZAZIONE
+def plot_explanations_grid(
+    explanations_all,
+    sample_imgs,
+    sample_labels,
+    methods=['saliency', 'ig', 'lime'],
+    lime_heatmaps=None
+):
     num_models = len(explanations_all)
     num_imgs = len(sample_imgs)
-    for img_idx in range(num_imgs):
-        plt.figure(figsize=(3 + 2*len(methods)*num_models, 3))
-        # Mostra l’immagine originale a sinistra
-        plt.subplot(1, 1 + num_models*len(methods), 1)
-        plt.imshow(sample_imgs[img_idx][0], cmap='gray')
-        plt.axis('off')
-        plt.title(f"Original\nLabel: {sample_labels[img_idx].item()}")
-        # Ora mostra le heatmap per ogni modello e metodo
-        plot_idx = 2
-        for model_info in explanations_all:
+    num_methods = len(methods)
+    
+    total_cols = 1 + num_models * num_methods  # 1 originale + heatmap per ogni modello/metodo
+
+    fig, axes = plt.subplots(num_imgs, total_cols, figsize=(3*total_cols, 3*num_imgs))
+
+    if num_imgs == 1:
+        axes = axes.reshape(1, -1)
+    if total_cols == 1:
+        axes = axes.reshape(-1, 1)
+
+    for i in range(num_imgs):
+        # Colonna 0: originale
+        axes[i, 0].imshow(sample_imgs[i][0], cmap='gray')
+        axes[i, 0].axis('off')
+        axes[i, 0].set_title(f"Original\nLabel: {sample_labels[i].item()}")
+        col = 1
+        for m_idx, model_info in enumerate(explanations_all):
             for method in methods:
-                heatmap = model_info['explanations'][img_idx]['explanations'][method]
-                plt.subplot(1, 1 + num_models*len(methods), plot_idx)
-                plt.imshow(heatmap, cmap='hot')
-                plt.axis('off')
-                plt.title(f"Model {model_info['model_id']+1}\n{method.capitalize()}")
-                plot_idx += 1
-        plt.tight_layout()
-        plt.show()
+                if method == "lime" and lime_heatmaps is not None:
+                    heatmap = lime_heatmaps[i]  # heatmap o immagine colorata da LIME
+                else:
+                    heatmap = model_info['explanations'][i]['explanations'][method]
+                axes[i, col].imshow(heatmap, cmap='hot')
+                axes[i, col].axis('off')
+                axes[i, col].set_title(f"Model {model_info['model_id']+1}\n{method.capitalize()}")
+                col += 1
 
-plot_explanations(explanations_all, sample_imgs, sample_labels, methods=EXPL_METHODS)
-'''
+    plt.tight_layout()
+    plt.show()
 
+plot_explanations_grid(explanations_all, sample_imgs, sample_labels, methods=['saliency', 'ig', 'lime'])
