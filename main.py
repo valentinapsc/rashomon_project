@@ -240,16 +240,31 @@ def calculate_similarity(exp1, exp2):
     flat1 = exp1_norm.flatten()
     flat2 = exp2_norm.flatten()
     # 1. SSIM
-    ssim_val = ssim(exp1_norm, exp2_norm, data_range=1.0)
+    try:
+        ssim_val = ssim(exp1_norm, exp2_norm, data_range=1.0)
+    except Exception:
+        ssim_val = np.nan
     # 2. Pearson
-    pearson_val, _ = pearsonr(flat1, flat2)
+    if np.std(flat1) == 0 or np.std(flat2) == 0:
+        pearson_val = np.nan
+    else:
+        pearson_val, _ = pearsonr(flat1, flat2)
     # 3. Spearman
-    spearman_val, _ = spearmanr(flat1, flat2)
+    if np.std(flat1) == 0 or np.std(flat2) == 0:
+        spearman_val = np.nan
+    else:
+        spearman_val, _ = spearmanr(flat1, flat2)
     # 4. Cosine
-    cosine_val = np.dot(flat1, flat2) / (np.linalg.norm(flat1) * np.linalg.norm(flat2) + 1e-10)
+    norm1 = np.linalg.norm(flat1)
+    norm2 = np.linalg.norm(flat2)
+    if norm1 == 0 or norm2 == 0:
+        cosine_val = np.nan
+    else:
+        cosine_val = np.dot(flat1, flat2) / (norm1 * norm2)
     # 5. MAE
     mae_val = np.mean(np.abs(exp1_norm - exp2_norm))
     return [ssim_val, pearson_val, spearman_val, cosine_val, mae_val]
+
 
 all_explanations = {}
 for model in explanations_all:
@@ -261,9 +276,10 @@ print("\n" + "="*50)
 print("Calcolo similarità tra spiegazioni")
 print("="*50)
 
-similarity_results = {m: {'same_model': [], 'diff_model': []} for m in EXPL_METHODS}
+similarity_results = {m: {'same_model': {met: [] for met in SIM_METRICS},
+                          'diff_model': {met: [] for met in SIM_METRICS}} for m in EXPL_METHODS}
 for m1, m2 in combinations(EXPL_METHODS, 2):
-    similarity_results[f"{m1}-{m2}"] = {'same_model': []}
+    similarity_results[f"{m1}-{m2}"] = {'same_model': {met: [] for met in SIM_METRICS}}
 
 # Per ogni immagine del campione
 for img_idx in tqdm(range(SAMPLE_SIZE)):
@@ -276,28 +292,33 @@ for img_idx in tqdm(range(SAMPLE_SIZE)):
                 model_exps[img_idx][m2]
             )
             for i, metric in enumerate(SIM_METRICS):
-                similarity_results[f"{m1}-{m2}"]['same_model'].append(sim_vals[i])
-    
+                similarity_results[f"{m1}-{m2}"]['same_model'][metric].append(sim_vals[i])
+
     # Inter-modello (confronta lo stesso metodo tra modelli diversi)
     for method in EXPL_METHODS:
         model_exps = [all_explanations[model_id][img_idx][method] for model_id in all_explanations]
         for exp1, exp2 in combinations(model_exps, 2):
             sim_vals = calculate_similarity(exp1, exp2)
             for i, metric in enumerate(SIM_METRICS):
-                similarity_results[method]['diff_model'].append(sim_vals[i])
+                similarity_results[method]['diff_model'][metric].append(sim_vals[i])
                 
 # Stampa risultati medi
 print("\nRisultati medi similarità INTRA-modello (tra metodi, stesso modello):")
 for key in similarity_results:
     if 'same_model' in similarity_results[key]:
-        means = [np.mean(similarity_results[key]['same_model']) for _ in SIM_METRICS]
-        print(f"{key}: {dict(zip(SIM_METRICS, [f'{m:.3f}' for m in means]))}")
+        print(f"{key}:")
+        for metric in SIM_METRICS:
+            vals = similarity_results[key]['same_model'][metric]
+            print(f"  {metric}: {np.nanmean(vals):.3f} (n={len(vals)})" if len(vals) > 0 else f"  {metric}: nessun confronto disponibile")
 
 print("\nRisultati medi similarità INTER-modello (stesso metodo, modelli diversi):")
 for method in EXPL_METHODS:
-    means = [np.mean(similarity_results[method]['diff_model']) for _ in SIM_METRICS]
-    print(f"{method}: {dict(zip(SIM_METRICS, [f'{m:.3f}' for m in means]))}")
-    
+    print(f"{method}:")
+    for metric in SIM_METRICS:
+        vals = similarity_results[method]['diff_model'][metric]
+        print(f"  {metric}: {np.nanmean(vals):.3f} (n={len(vals)})" if len(vals) > 0 else f"  {metric}: nessun confronto disponibile")
+
+
 # VALUTAZIONE QUALITÀ (MoRF)
 def morf_curve_torch(model, image, explanation, true_class, steps=10, device='cpu'):
 
@@ -326,7 +347,7 @@ def morf_curve_torch(model, image, explanation, true_class, steps=10, device='cp
             prob = torch.softmax(output, dim=1)[0, true_class].item()
         probas.append(prob)
     # Area sotto la curva (integrale)
-    auc = np.trapz(probas, dx=1.0/steps)
+    auc = np.trapezoid(probas, dx=1.0/steps)
     return auc, probas
 
 # === Calcolo MoRF per ogni modello, metodo, immagine campione ===
