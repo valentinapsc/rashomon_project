@@ -320,7 +320,7 @@ for method in EXPL_METHODS:
 
 
 # VALUTAZIONE QUALITÀ (MoRF)
-def morf_curve_torch(model, image, explanation, true_class, steps=10, device='cpu'):
+def morf_curve_aopc(model, image, explanation, true_class, steps=10, device='cpu'):
 
     model.eval()
     img = image.clone().detach().to(device)
@@ -330,25 +330,24 @@ def morf_curve_torch(model, image, explanation, true_class, steps=10, device='cp
     idx_sorted = np.argsort(flat_exp)[::-1]  # feature più importanti prima
 
     probas = []
-    mask = img.clone()
-    for step in range(steps):
-        num_to_remove = int((step + 1) / steps * len(flat_exp))
-        remove_indices = idx_sorted[:num_to_remove]
-
-        # Crea una copia dell'immagine
+    for step in range(steps + 1):  # steps+1 per includere la baseline
+        num_to_remove = int((step) / steps * len(flat_exp))
         masked = img.clone()
-        for idx in remove_indices:
-            h, w = np.unravel_index(idx, explanation.shape)
-            masked[0, h, w] = baseline_val  # azzera feature importante
-
+        if num_to_remove > 0:
+            remove_indices = idx_sorted[:num_to_remove]
+            for idx in remove_indices:
+                h, w = np.unravel_index(idx, explanation.shape)
+                masked[0, h, w] = baseline_val
         # Predizione
         with torch.no_grad():
             output = model(masked.unsqueeze(0).to(device))  # [1, 1, 28, 28]
             prob = torch.softmax(output, dim=1)[0, true_class].item()
         probas.append(prob)
-    # Area sotto la curva (integrale)
-    auc = np.trapezoid(probas, dx=1.0/steps)
-    return auc, probas
+    # Calcolo AOPC
+    f0 = probas[0]
+    diffs = [f0 - p for p in probas]
+    aopc = np.mean(diffs)
+    return aopc, probas
 
 # === Calcolo MoRF per ogni modello, metodo, immagine campione ===
 
@@ -371,16 +370,16 @@ for model_idx, model in enumerate(rashomon_models):
         for method in EXPL_METHODS:
             # explanation: [28, 28], numpy
             explanation = explanations_all[model_idx]['explanations'][img_idx]['explanations'][method]
-            auc, probas = morf_curve_torch(
+            aopc, probas = morf_curve_aopc(
                 model, sample_img, explanation, true_class, steps=STEPS_MORF, device=device
             )
-            quality_results[method].append(auc)
+            quality_results[method].append(aopc)
 
-# Output: media e std AUC MoRF per ogni metodo
-print("\nRisultati MoRF (Area sotto la curva, più bassa = spiegazione più efficace):")
+# Output: media e std AOPC per ogni metodo
+print("\nRisultati AOPC (più alto = spiegazione più efficace):")
 for method in EXPL_METHODS:
-    aucs = quality_results[method]
-    print(f"- {method}: mean={np.mean(aucs):.4f}, std={np.std(aucs):.4f} (n={len(aucs)})")
+    aopcs = quality_results[method]
+    print(f"- {method}: mean={np.mean(aopcs):.4f}, std={np.std(aopcs):.4f} (n={len(aopcs)})")
 
 
 # VISUALIZZAZIONE
