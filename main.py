@@ -45,6 +45,18 @@ train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
 test_loader = DataLoader(mnist_test, batch_size=BATCH_SIZE)
 
+
+# Funzione per creare la feature mask per LIME
+def create_feature_mask(patch=4):
+    H = W = 28
+    h_blocks, w_blocks = H // patch, W // patch
+    row_ids = torch.arange(h_blocks).repeat_interleave(patch)
+    col_ids = torch.arange(w_blocks).repeat_interleave(patch)
+    feature_ids = (row_ids.unsqueeze(1) * w_blocks + col_ids).to(dtype=torch.long)
+    return feature_ids.unsqueeze(0).unsqueeze(0)  # [1,1,28,28]
+
+FEATURE_MASK = create_feature_mask(patch=4)  # patch=4 => 49 feature
+
 # MODELLO 
 class SimpleCNN(nn.Module):
     def __init__(self):
@@ -180,7 +192,16 @@ def generate_ig(model, sample, label):
 # esempio di “XAI model-agnostic”
 def generate_lime(model, sample, label):
     explainer = Lime(model)
-    attr = explainer.attribute(sample, target=label, n_samples=100)
+    baseline_val = torch.mean(sample) 
+
+    attr = explainer.attribute(
+        sample,
+        target=label,
+        n_samples=1000,                     # più campioni
+        feature_mask=FEATURE_MASK.to(sample.device),
+        perturbations_per_eval=50,          # batch su CPU
+        baselines=baseline_val
+    )
     arr = attr.squeeze().cpu().detach().numpy()
     arr = (arr - arr.min()) / (arr.max() - arr.min() + 1e-8)
     return arr
