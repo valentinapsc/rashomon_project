@@ -303,20 +303,28 @@ for img_idx in tqdm(range(SAMPLE_SIZE)):
                 similarity_results[method]['diff_model'][metric].append(sim_vals[i])
                 
 # Stampa risultati medi
+# ---- INTRA: tra metodi, stesso modello (SOLO COPPIE) ----
 print("\nRisultati medi similarità INTRA-modello (tra metodi, stesso modello):")
-for key in similarity_results:
-    if 'same_model' in similarity_results[key]:
-        print(f"{key}:")
-        for metric in SIM_METRICS:
-            vals = similarity_results[key]['same_model'][metric]
-            print(f"  {metric}: {np.nanmean(vals):.3f} (n={len(vals)})" if len(vals) > 0 else f"  {metric}: nessun confronto disponibile")
+pair_keys = [f"{m1}-{m2}" for m1, m2 in combinations(EXPL_METHODS, 2)]
+for key in pair_keys:
+    print(f"{key}:")
+    for metric in SIM_METRICS:
+        vals = similarity_results[key]['same_model'][metric]
+        if len(vals) > 0 and not np.isnan(np.nanmean(vals)):
+            print(f"  {metric}: {np.nanmean(vals):.3f} (n={len(vals)})")
+        else:
+            print(f"  {metric}: n/d")
 
+# ---- INTER: stesso metodo, modelli diversi (SOLO METODI) ----
 print("\nRisultati medi similarità INTER-modello (stesso metodo, modelli diversi):")
 for method in EXPL_METHODS:
     print(f"{method}:")
     for metric in SIM_METRICS:
         vals = similarity_results[method]['diff_model'][metric]
-        print(f"  {metric}: {np.nanmean(vals):.3f} (n={len(vals)})" if len(vals) > 0 else f"  {metric}: nessun confronto disponibile")
+        if len(vals) > 0 and not np.isnan(np.nanmean(vals)):
+            print(f"  {metric}: {np.nanmean(vals):.3f} (n={len(vals)})")
+        else:
+            print(f"  {metric}: n/d")
 
 
 # VALUTAZIONE QUALITÀ (MoRF)
