@@ -10,3 +10,13 @@ data/
 *.pt
 .DS_Store
 .env
+
+#latex
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
