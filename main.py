@@ -197,7 +197,7 @@ def generate_lime(model, sample, label):
     attr = explainer.attribute(
         sample,
         target=label,
-        n_samples=1000,                     # più campioni
+        n_samples=200,                     # più campioni
         feature_mask=FEATURE_MASK.to(sample.device),
         perturbations_per_eval=50,          # batch su CPU
         baselines=baseline_val

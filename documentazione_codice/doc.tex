@@ -2,6 +2,48 @@
 \usepackage{graphicx}
 \usepackage{float}
 
+\usepackage[numbers,sort&compress]{natbib}
+
+\usepackage{listings}
+\usepackage[utf8]{inputenc}
+\usepackage{xcolor}
+
+\usepackage{tikz}
+\usetikzlibrary{positioning,shapes.geometric,arrows.meta}
+
+\tikzset{
+  mybox/.style={
+    draw, rounded corners, fill=blue!10, align=center,
+    minimum height=10mm, text width=6.2cm, inner sep=4pt
+  },
+  startstop/.style={
+    draw, rounded corners, fill=red!15, align=center,
+    minimum height=10mm, text width=6.2cm, inner sep=4pt
+  },
+  decision/.style={
+    draw, diamond, aspect=2.2, fill=green!20, align=center, inner sep=1pt
+  },
+  arrow/.style={-{Stealth[length=2.4mm]}, thick}
+}
+
+
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    backgroundcolor=\color{gray!10},
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{green!50!black}\itshape,
+    stringstyle=\color{red!60!black},
+    showstringspaces=false,
+    breaklines=true,
+    breakatwhitespace=true,
+    columns=fullflexible,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    numbersep=5pt
+}
+
 \title{doc}
 \author{Valentina piscopo}
 \date{August 2025}
@@ -16,91 +58,157 @@
 \section{Introduzione}
 
 Quando ci affidiamo ai metodi di spiegazione per i modelli di \emph{machine
-      learning}, nasce una domanda fondamentale: \textit{quanto sono simili tra loro
-      le spiegazioni prodotte da diversi algoritmi o modelli, e come è possibile
-      misurare questa similarità?}
+      learning}, sorge una domanda cruciale: \textit{quanto sono simili le
+      spiegazioni prodotte da diversi algoritmi o modelli, e come possiamo misurare
+      questa similarità?}
 
-Nel contesto del \emph{Rashomon effect}, in cui si osserva la coesistenza di
-molteplici modelli con prestazioni equivalenti ma parametri differenti, questa
-domanda diventa ancora più centrale: se più modelli ottengono gli stessi
-risultati, ci aspettiamo che le loro decisioni vengano spiegate nello stesso
-modo?
+Nel contesto del \emph{Rashomon effect}
+\cite{mueller2023rashomon,leventi2023consistency}, in cui coesistono molteplici
+modelli con prestazioni equivalenti ma parametri differenti, questa domanda
+assume un significato ancora più rilevante: se due modelli ottengono lo stesso
+livello di accuratezza, possiamo aspettarci che spieghino le proprie decisioni
+nello stesso modo?
 
-Per affrontare questa questione si può procedere nel seguente modo:
+Per affrontare questo problema, si adotta un approccio in tre fasi:
 \begin{enumerate}
-      \item Costruire un setup sperimentale in cui diversi modelli, ugualmente accurati,
-            vengano analizzati con uno o più metodi di spiegazione.
-      \item Applicare diverse metriche di similarità alle spiegazioni ottenute, ad esempio
-            lo \emph{Structural Similarity Index} (SSIM), la correlazione di Pearson, la
-            similarità coseno, ecc.
-      \item Confrontare i risultati delle metriche per capire se, e quanto, variano le
-            spiegazioni a seconda del modello e del metodo utilizzato.
+      \item Costruire un setup sperimentale con più modelli ugualmente accurati,
+            appartenenti a un \emph{Rashomon set}, e analizzarli con diversi metodi di
+            spiegazione.
+      \item Applicare più metriche di similarità (ad esempio \emph{Structural Similarity
+                  Index} — SSIM, correlazione di Pearson, similarità coseno, ecc.) alle
+            spiegazioni prodotte.
+      \item Confrontare i risultati per capire come varia la spiegazione in funzione sia
+            del modello che del metodo scelto.
 \end{enumerate}
 
-Tuttavia, emergono alcune criticità:
+Tuttavia, questo approccio presenta alcune criticità:
 \begin{itemize}
-      \item Spiegazioni diverse producono valori di similarità differenti anche per lo
-            stesso input. Due metodi di spiegazione potrebbero identificare feature diverse
-            come rilevanti.
-      \item Due metriche diverse potrebbero restituire giudizi contrastanti sul grado di
+      \item Due metodi di spiegazione, applicati allo stesso input, possono evidenziare
+            regioni o feature completamente diverse come rilevanti.
+      \item Metriche diverse possono portare a conclusioni contrastanti sul grado di
             similarità.
-      \item Non sempre è chiaro quale spiegazione sia migliore: una spiegazione più simile
-            a un’altra non è automaticamente più fedele o più utile; spesso manca un
-            \emph{ground truth} oggettivo della spiegazione ideale.
+      \item L’assenza di un \emph{ground truth} della “spiegazione corretta” rende
+            impossibile dichiarare in assoluto quale metodo sia “migliore”.
 \end{itemize}
 
-La qualità di una spiegazione va quindi oltre la sola similarità: per capire se
-una spiegazione è effettivamente efficace, occorre valutarne anche la
-\emph{fedeltà} al funzionamento reale del modello. Un approccio diffuso a
-questo scopo è l’analisi mediante curve \emph{MoRF} (\emph{Most Relevant
-      First}): si mascherano progressivamente le feature considerate importanti dalla
-spiegazione e si osserva quanto rapidamente decresce la confidenza del modello.
+Per questo motivo, la sola similarità non è sufficiente a giudicare la qualità
+di una spiegazione. È necessario integrarla con un’analisi della
+\emph{fedeltà}, cioè della capacità della spiegazione di individuare feature
+realmente decisive per la predizione del modello.
 
-Ad esempio, immaginiamo una rete neurale che riconosce un gatto in una foto: se
-la spiegazione individua le orecchie come la feature più rilevante e,
-rimuovendole, la probabilità che il modello predica “gatto” cala drasticamente,
-allora la spiegazione si dimostra fedele. Se invece la predizione cambia di
-poco, la spiegazione perde significato.
+Un approccio comunemente adottato è l’analisi \emph{Most Relevant First} (MoRF)
+\cite{samek2016evaluating}, in cui si mascherano progressivamente le feature
+più importanti secondo la spiegazione e si osserva la velocità con cui decresce
+la confidenza del modello. Ad esempio, in un classificatore di immagini, se
+rimuovere la regione indicata come più rilevante provoca un crollo immediato
+della probabilità predetta per la classe corretta, la spiegazione è considerata
+fedele; al contrario, un impatto minimo sulla predizione indicherebbe una
+spiegazione poco utile.
 
-In letteratura non esiste una metrica unica e definitiva per confrontare o
-valutare le spiegazioni; piuttosto, si adottano più prospettive complementari,
-mettendo a confronto i risultati tra metodi e modelli diversi, e integrando
-valutazioni di similarità con misure di fedeltà come MoRF.
+In letteratura non esiste una metrica unica e definitiva per la valutazione
+delle spiegazioni \cite{adadi2018survey}, ma piuttosto un insieme di
+prospettive complementari. Questa tesi adotta quindi una doppia prospettiva:
+\begin{itemize}
+      \item analisi della \textbf{similarità} tra spiegazioni (intra-modello e
+            inter-modello);
+      \item analisi della \textbf{fedeltà} tramite MoRF e \emph{Area Over the Perturbation
+                  Curve} (AOPC).
+\end{itemize}
+
+L’obiettivo finale è indagare se e come l’effetto Rashomon si manifesti non
+solo nelle predizioni, ma anche nell’interpretabilità, valutando la coerenza e
+l’affidabilità dei metodi XAI in scenari controllati.
 
 \section{Introduzione all’implementazione sperimentale}
 
 L’esperimento è stato strutturato come una pipeline in più fasi, ciascuna con
-un obiettivo specifico:
+un obiettivo specifico, seguendo approcci già consolidati in letteratura
+\citep{mueller2023rashomon,leventi2023consistency,adadi2018survey}:
 
 \begin{enumerate}
-      \item \textbf{Costruzione di un Rashomon set}: una raccolta di modelli differenti, ma tutti con prestazioni simili sullo stesso compito di classificazione.
-      \item \textbf{Applicazione di metodi di spiegazione}: generazione di spiegazioni locali per ciascun modello, su un insieme di dati di test, utilizzando diversi algoritmi XAI.
-      \item \textbf{Valutazione della similarità delle spiegazioni}: confronto quantitativo tra le spiegazioni prodotte da modelli e metodi differenti, tramite varie metriche di similarità.
-      \item \textbf{Valutazione della fedeltà delle spiegazioni}: misurazione di quanto le feature individuate dalle spiegazioni siano realmente determinanti per le predizioni dei modelli, mediante tecniche come le curve \emph{MoRF}.
+      \item \textbf{Costruzione di un Rashomon set}: una raccolta di modelli differenti,
+            ma tutti con prestazioni simili sullo stesso compito di classificazione,
+            in linea con la definizione proposta da \citet{fisher2019all}.
+      \item \textbf{Applicazione di metodi di spiegazione}: generazione di spiegazioni locali
+            per ciascun modello, su un insieme di dati di test, utilizzando diversi algoritmi XAI,
+            tra cui Saliency \citep{simonyan2013deep}, Integrated Gradients \citep{sundararajan2017axiomatic}
+            e LIME \citep{ribeiro2016lime}.
+      \item \textbf{Valutazione della similarità delle spiegazioni}: confronto quantitativo
+            tra le spiegazioni prodotte da modelli e metodi differenti, tramite varie metriche di similarità
+            già impiegate in studi precedenti \citep{samek2016evaluating,adebayo2018sanity}.
+      \item \textbf{Valutazione della fedeltà delle spiegazioni}: misurazione di quanto le
+            feature individuate dalle spiegazioni siano realmente determinanti per le predizioni dei modelli,
+            mediante tecniche come le curve \emph{MoRF} \citep{samek2016evaluating}.
 \end{enumerate}
+
+\begin{figure}[htbp]
+      \centering
+      \footnotesize
+      \begin{tikzpicture}[node distance=8mm]
+            % Colonna sinistra
+            \node (start)   [startstop] {Dataset MNIST (train/val/test)};
+            \node (train)   [mybox, below=of start] {Addestramento di \texttt{NUM\_MODELS} CNN\\
+                  Parametri: EPOCHS, BATCH\_SIZE, PATIENCE};
+            \node (sel)     [decision, below=12mm of train] {Accuracy\textsubscript{val} $\ge$ best $-$ 1\%?};
+            \node (discard) [mybox, below=14mm of sel] {Modello scartato};
+
+            % Colonna destra
+            \node (rashomon) [mybox, right=22mm of sel] {Rashomon set\\(modelli selezionati)};
+            \node (explain)  [mybox, below=of rashomon] {Generazione spiegazioni:\\
+                  Saliency, IG, LIME\\
+                  IG: baseline = zeri\\
+                  LIME: media immagine, \texttt{feature\_mask} 4$\times$4, $n\_\mathrm{samples}=100$};
+            \node (sim)      [mybox, below=of explain] {Calcolo similarità:\\
+                  \emph{Intra-modello} (tra metodi)\\
+                  \emph{Inter-modello} (stesso metodo)\\
+                  Metriche: SSIM, Pearson, Spearman, Cosine, MAE};
+            \node (morf)     [mybox, below=of sim] {Valutazione fedeltà (MoRF)\\
+                  Metrica: AOPC, $K=10$ step\\
+                  Baseline mascheramento: media immagine};
+            \node (results)  [startstop, below=of morf] {Risultati, tabelle, grafici, interpretazione};
+
+            % Frecce principali
+            \draw[arrow] (start) -- (train);
+            \draw[arrow] (train) -- (sel);
+            \draw[arrow] (sel.east) -- (rashomon.west);
+            \draw[arrow] (rashomon) -- (explain);
+            \draw[arrow] (explain) -- (sim);
+            \draw[arrow] (sim) -- (morf);
+            \draw[arrow] (morf) -- (results);
+
+            % Freccia verso "scartato"
+            \draw[arrow] (sel.south) -- ++(0,-7mm) -- (discard.north);
+
+      \end{tikzpicture}
+      \caption{Pipeline dell’esperimento: addestramento e selezione del Rashomon set, generazione delle spiegazioni, confronto di similarità e valutazione della fedeltà (MoRF/AOPC).}
+      \label{fig:pipeline}
+\end{figure}
 
 \subsection{Tecnologie}
 Per implementare il workflow sperimentale descritto, è stato utilizzato un
 ecosistema di strumenti largamente adottati in ambito \emph{explainable AI}, in
-grado di garantire affidabilità, riproducibilità e scalabilità:
+grado di garantire affidabilità, riproducibilità e scalabilità
+\citep{adadi2018survey,mueller2023rashomon}:
 
 \begin{itemize}
       \item \textbf{Python 3.x}: linguaggio di riferimento per la ricerca in XAI, scelto per la sua flessibilità e l’ampia disponibilità di librerie specializzate.
       \item \textbf{PyTorch}: libreria \emph{open-source} per il \emph{machine learning} e \emph{deep learning}, dotata di supporto nativo per l’autograd e adatta alla prototipazione rapida di modelli. Utilizzata per la definizione, l’addestramento e la validazione delle reti neurali, nonché per il calcolo dei gradienti richiesto dai metodi \emph{Saliency} e \emph{Integrated Gradients}.
       \item \textbf{Torchvision}: libreria complementare a PyTorch che offre dataset predefiniti (come MNIST), trasformazioni standard per immagini e modelli già pronti. Utilizzata per il download, la gestione e il preprocessing del dataset MNIST.
-      \item \textbf{Captum}: libreria open source specifica per l’interpretabilità di modelli PyTorch. Fornisce implementazioni ottimizzate di numerosi metodi XAI, con API coerenti e facilmente integrabili. Utilizzata per generare le spiegazioni su tutti i modelli del Rashomon set, includendo metodi \emph{gradient-based} e \emph{model-agnostic}.
+      \item \textbf{Captum} \citep{kokhlikyan2020captum}: libreria open source specifica per l’interpretabilità di modelli PyTorch. Fornisce implementazioni ottimizzate di numerosi metodi XAI, con API coerenti e facilmente integrabili. Utilizzata per generare le spiegazioni su tutti i modelli del Rashomon set, includendo metodi \emph{gradient-based} e \emph{model-agnostic}.
       \item \textbf{NumPy}: libreria fondamentale per il calcolo scientifico e la manipolazione efficiente di array numerici, usata per l’elaborazione dei dati, la normalizzazione delle spiegazioni e il calcolo di metriche.
       \item \textbf{Scikit-learn}: utilizzata per il calcolo di metriche (correlazioni, MAE) e per funzioni di utilità scientifica.
       \item \textbf{SciPy}: impiegata per calcolare correlazioni avanzate come Spearman e Pearson.
       \item \textbf{Scikit-image}: usata per il calcolo della metrica \emph{SSIM} (\emph{Structural Similarity Index}).
       \item \textbf{Matplotlib}: libreria di riferimento per la visualizzazione scientifica, utilizzata per produrre grafici e visualizzazioni qualitative delle spiegazioni.
-      \item \textbf{Tqdm}: per fornire barre di avanzamento e monitorare l’esecuzione di processi lunghi.
+      \item \textbf{Tqdm} \citep{tqdm}: per fornire barre di avanzamento e monitorare l’esecuzione di processi lunghi.
       \item \textbf{Glob, os}: per la gestione di file, directory e per il caricamento/salvataggio dei modelli, a supporto della riproducibilità.
 \end{itemize}
 
 \subsection{Riproducibilità e ambiente di sviluppo}
 Per garantire la riproducibilità degli esperimenti e la gestione efficiente
-delle dipendenze, sono state adottate le seguenti buone pratiche:
+delle dipendenze, sono state adottate le seguenti buone pratiche, in linea con
+le raccomandazioni di \citet{pineau2020improving}:
+
 \begin{itemize}
       \item \textbf{Gestione dell’ambiente con \emph{conda}}: tutte le dipendenze (librerie e relative versioni) sono state installate in un ambiente dedicato, così da poter replicare esattamente il contesto di esecuzione.
       \item \textbf{Controllo della casualità}: i \emph{random seed} sono stati fissati per NumPy, PyTorch e il generatore casuale di Python, così da rendere i risultati ripetibili anche in presenza di componenti stocastiche come l’inizializzazione dei pesi o lo \emph{shuffle} dei dati.
@@ -109,28 +217,64 @@ delle dipendenze, sono state adottate le seguenti buone pratiche:
 
 \subsection{Scelte implementative}
 
-Tutti gli esperimenti sono stati condotti utilizzando \textbf{CPU} anziché GPU,
-condizione che ha influenzato alcune scelte implementative per mantenere tempi
-di esecuzione ragionevoli.
+Gli esperimenti sono stati condotti interamente su \textbf{CPU}, scelta che ha
+avuto un impatto diretto sulle decisioni implementative. Lavorare senza GPU ha
+imposto di trovare un equilibrio tra fedeltà delle spiegazioni e tempi di
+calcolo ragionevoli, evitando configurazioni eccessivamente costose in termini
+computazionali \citep{leventi2023consistency}.
 
-\begin{itemize}
-      \item \textbf{LIME:} è stato adottato un approccio \textit{patch-based} su immagini MNIST ($28\times28$ pixel), con suddivisione in blocchi $4\times4$ (\texttt{feature\_mask}) per un totale di 49 feature. Questa scelta riduce drasticamente il rumore rispetto a una perturbazione a livello di singolo pixel (784 feature), aumentando la stabilità delle spiegazioni e riducendo il tempo di calcolo. Il numero di campioni per LIME è stato fissato a $n\_samples = 1000$, per aumentare la stabilità delle spiegazioni rispetto a un numero minore di campioni. Questa scelta, pur aumentando i tempi di calcolo su CPU, è stata resa sostenibile grazie all’uso di \texttt{perturbations\_per\_eval=50}, che consente di elaborare batch di perturbazioni in parallelo riducendo l’overhead.
+\paragraph{LIME.}
+Invece di operare a livello di singolo pixel (784 feature su MNIST), è stato
+adottato un approccio \textit{patch-based}, suddividendo ogni immagine
+$28\times28$ in blocchi $4\times4$ (\texttt{feature\_mask}), per un totale di
+49 feature. Questa scelta è coerente con le raccomandazioni di
+\citet{ribeiro2016lime} per ridurre il rumore e migliorare la stabilità:
+\begin{enumerate}
+      \item Riduce il rumore nelle spiegazioni: LIME soffre particolarmente quando le
+            feature sono estremamente piccole, perché le perturbazioni casuali tendono a
+            distruggere informazioni rilevanti.
+      \item Riduce drasticamente il numero di perturbazioni necessarie per ottenere una
+            regressione lineare stabile.
+\end{enumerate}
+Il numero di campioni $n\_samples$ è stato fissato a 200, per mitigare la variabilità intrinseca di LIME e migliorare la ripetibilità dei risultati.
+Poiché ogni spiegazione richiede $n\_samples$ forward pass, è stato utilizzato \texttt{perturbations\_per\_eval=50} per elaborare perturbazioni in batch, riducendo così l’overhead di chiamate ripetute al modello.
 
-      \item \textbf{Integrated Gradients (IG):} è stato utilizzato il numero di passi predefinito di Captum (\texttt{n\_steps} di default), con baseline impostata a un’immagine di zeri. Questo riduce i costi di calcolo evitando sampling multipli.
+\paragraph{Integrated Gradients (IG).}
+È stato mantenuto il valore predefinito di \texttt{n\_steps} fornito da Captum.
+Questo riduce il numero di forward pass necessari rispetto a valori più alti (che migliorano la precisione dell’integrazione ma aumentano i tempi di calcolo).
+Come baseline è stata utilizzata un’immagine completamente nera (tutti zeri), scelta comune in letteratura per dataset con sfondo uniforme come MNIST \citep{sundararajan2017axiomatic}.
 
-      \item \textbf{Saliency:} calcolata con il metodo standard di Captum senza smoothing addizionale, per mantenere la velocità di esecuzione e non introdurre bias dovuto a parametri aggiuntivi.
+\paragraph{Saliency.}
+Calcolata con il metodo base di Captum senza smoothing o normalizzazioni
+aggiuntive, per preservare la semplicità e l’interpretabilità diretta delle
+gradient map. Tecniche come SmoothGrad \citep{smilkov2017smoothgrad} avrebbero
+aumentato la stabilità visiva, ma anche i tempi di calcolo di ordini di
+grandezza.
 
-      \item \textbf{MoRF/AOPC:} la mascheratura progressiva utilizza 10 step, sostituendo le feature con la \textit{media dell’immagine} come baseline. Questa scelta minimizza l’impatto visivo di feature rimosse mantenendo tempi computazionali bassi.
+\paragraph{MoRF/AOPC.}
+La valutazione di fedeltà è stata implementata rimuovendo progressivamente le
+feature più importanti in 10 step. La baseline di rimpiazzo è stata scelta come
+\textit{media dell’immagine} anziché zeri, per minimizzare il rischio di
+introdurre pattern artificiali fuori distribuzione che avrebbero potuto
+alterare il comportamento del modello \citep{samek2016evaluating}.
 
-      \item \textbf{Selezione del Rashomon set:} i modelli vengono scelti in base alla \textit{validation accuracy}, con soglia di Rashomon fissata all’1\% rispetto al miglior modello. Per ogni modello salvato, si memorizza lo stato in formato \texttt{.pt} di PyTorch.
-\end{itemize}
+\paragraph{Selezione del Rashomon set.}
+La scelta dei modelli è stata guidata dalla \textit{validation accuracy},
+selezionando tutti quelli entro l’1\% dal miglior modello, seguendo la
+definizione operativa di \citet{mueller2023rashomon}. Questo garantisce che le
+differenze osservate nelle spiegazioni non siano dovute a variazioni
+significative in termini di performance di classificazione. Ogni modello è
+stato salvato in formato \texttt{.pt} di PyTorch, assicurando la
+riproducibilità esatta delle sperimentazioni.
 
-In tutti i casi, le attribuzioni sono calcolate rispetto alla \textbf{classe
-      vera} (\textit{true label}) e non rispetto alla classe predetta. Questa scelta
-è stata effettuata per garantire coerenza con il \textit{ground truth} ed
-evitare che eventuali errori di predizione introducano variazioni spurie nelle
-spiegazioni. Tuttavia, ciò rappresenta una possibile minaccia alla validità
-esterna, poiché in scenari reali la classe vera non è nota all’utente finale.
+\paragraph{Classe di riferimento per le attribuzioni.}
+Le attribuzioni sono calcolate rispetto alla \textbf{classe vera} (\textit{true
+      label}) e non a quella predetta. Questa scelta, già discussa in studi
+precedenti \citep{arras2019evaluating}, mira a mantenere coerenza con il
+\textit{ground truth}, evitando che errori di classificazione contaminino il
+confronto tra spiegazioni. Tuttavia, si riconosce che questa impostazione non
+riflette scenari reali, dove la classe vera potrebbe non essere disponibile —
+rappresentando quindi una possibile minaccia alla validità esterna.
 
 \subsection{Hyperparametri e setup sperimentale}
 
@@ -152,7 +296,7 @@ riproducibilità dei risultati.
             Batch size                      & 128                                                         \\
             Baseline IG                     & immagine di zeri                                            \\
             Baseline MoRF                   & media dell’immagine                                         \\
-            $n\_samples$ LIME               & 1000                                                        \\
+            $n\_samples$ LIME               & 200                                                         \\
             Feature mask LIME               & blocchi 4×4 (49 feature totali)                             \\
             $n\_steps$ IG                   & valore predefinito Captum                                   \\
             Step MoRF                       & 10                                                          \\
@@ -169,12 +313,13 @@ riproducibilità dei risultati.
 \section{Il Rashomon set}
 
 Il \emph{Rashomon set} è una collezione di modelli diversi che ottengono
-prestazioni simili su un determinato compito. Prende il nome dall’effetto
-Rashomon, che descrive la possibilità che più spiegazioni, tutte coerenti con i
-dati osservati, possano emergere per lo stesso fenomeno. In ambito
-\emph{machine learning}, questo implica che, anche a parità di accuratezza,
-modelli con parametri differenti possono fornire spiegazioni distinte per le
-proprie decisioni.
+prestazioni simili su un determinato compito. Il termine deriva
+dall’\emph{effetto Rashomon}, che descrive la possibilità che più spiegazioni,
+tutte coerenti con i dati osservati, possano emergere per lo stesso fenomeno
+\citep{mueller2023rashomon}. In ambito \emph{machine learning}, ciò implica
+che, anche a parità di accuratezza, modelli con parametri differenti possono
+fornire spiegazioni distinte per le proprie decisioni
+\citep{fisher2019all,semenova2019existence}.
 
 \subsection{Costruzione}
 Il Rashomon set è stato costruito allenando più reti neurali della stessa
@@ -183,12 +328,12 @@ diversa inizializzazione casuale dei pesi (\emph{random seed} differente) ed è
 addestrata sugli stessi dati con un protocollo identico, che include la
 suddivisione in training, validation e test set.
 
-Durante l’addestramento è stata applicata la tecnica di \emph{early stopping}:
-per ogni modello, l’allenamento viene interrotto se le prestazioni sul
-validation set non migliorano per un numero prestabilito di epoche consecutive.
-In questo modo si seleziona automaticamente la versione del modello che ha
-ottenuto la miglior accuratezza sul validation, riducendo il rischio di
-overfitting.
+Durante l’addestramento è stata applicata la tecnica di \emph{early stopping}
+\citep{prechelt1998early}: per ogni modello, l’allenamento viene interrotto se
+le prestazioni sul validation set non migliorano per un numero prestabilito di
+epoche consecutive. In questo modo si seleziona automaticamente la versione del
+modello che ha ottenuto la miglior accuratezza sul validation, riducendo il
+rischio di overfitting e garantendo un confronto equo tra i membri del set.
 
 \subsection{Selezione}
 Al termine dell’addestramento, sono stati selezionati tutti i modelli che
@@ -202,18 +347,33 @@ all’1\%:
 dove:
 \begin{itemize}
       \item $\mathrm{Accuracy}_{\mathrm{val}}(m_{\mathrm{best}})$ è la miglior accuratezza sul validation ottenuta tra tutti i modelli addestrati;
-      \item $\epsilon$ è la tolleranza fissata (0.01 in questo caso).
+      \item $\epsilon$ è la tolleranza fissata (0.01 in questo caso), in linea con la definizione operativa di Rashomon set \citep{fisher2019all}.
 \end{itemize}
 
-Questo criterio garantisce che i modelli del Rashomon set siano equivalenti dal
-punto di vista delle prestazioni, pur potendo avere rappresentazioni interne e
-logiche decisionali differenti.
+Questo criterio garantisce che i modelli selezionati siano equivalenti dal
+punto di vista delle prestazioni predittive, pur potendo avere rappresentazioni
+interne e logiche decisionali differenti
+\citep{leventi2023consistency,mueller2023rashomon}.
+
+\begin{lstlisting}[caption={Addestramento modelli e selezione Rashomon set}, label={lst:rashomon_training}]
+for i in 1 to NUM_MODELS:
+    imposta_seed(SEED + i)
+    
+    modello, acc_validazione = addestra_modello(dati_train, dati_val)
+    
+    if acc_validazione > best_acc_validazione:
+        aggiorna_best_accuracy(acc_validazione)
+
+    if acc_validazione >= best_acc_validazione - SOGLIA_RASHOMON:
+        aggiungi_a_rashomon_set(modello)
+        salva_modello(modello)
+\end{lstlisting}
 
 \subsection{Obiettivi}
 La costruzione del Rashomon set serve a due scopi principali:
 \begin{enumerate}
-      \item \textbf{Studiare la variabilità delle spiegazioni}: se modelli ugualmente accurati forniscono spiegazioni simili, allora queste possono essere considerate robuste; se divergono, si manifesta l’effetto Rashomon anche nell’interpretabilità.
-      \item \textbf{Testare i metodi di spiegazione}: usando un insieme di modelli equivalenti, è possibile valutare la coerenza e la fedeltà delle spiegazioni prodotte da diversi algoritmi XAI.
+      \item \textbf{Studiare la variabilità delle spiegazioni}: se modelli ugualmente accurati forniscono spiegazioni simili, allora queste possono essere considerate robuste; se divergono, si manifesta l’effetto Rashomon anche nell’interpretabilità \citep{mueller2023rashomon}.
+      \item \textbf{Testare i metodi di spiegazione}: usando un insieme di modelli equivalenti, è possibile valutare la coerenza e la fedeltà delle spiegazioni prodotte da diversi algoritmi XAI \citep{leventi2023consistency}.
 \end{enumerate}
 
 \subsection{Approfondimento: equivalenza tra modelli}
@@ -281,6 +441,21 @@ Successivamente, addestra un modello interpretabile locale (ad esempio una
 regressione lineare) per stimare quali feature hanno avuto il maggiore impatto
 sulla decisione del modello. Nel caso di MNIST, le perturbazioni sono
 effettuate a livello di singolo pixel, senza segmentazione in super-pixel.
+
+\begin{lstlisting}[caption={Generazione delle spiegazioni}, label={lst:xai_generation}]
+function genera_spiegazioni(modello, immagine, etichetta_vera):
+    spiegazioni = {}
+    
+    spiegazioni["Saliency"] = calcola_saliency(modello, immagine, etichetta_vera)
+    spiegazioni["IG"] = calcola_integrated_gradients(
+        modello, immagine, etichetta_vera, baseline_zeri)
+    spiegazioni["LIME"] = calcola_lime(
+        modello, immagine, etichetta_vera,
+        campioni=200, maschera_feature=FEATURE_MASK,
+        baseline_media_pixel)
+    
+    return spiegazioni
+\end{lstlisting}
 
 \subsection{Motivazioni della scelta}
 La combinazione di questi tre metodi consente di confrontare:
@@ -361,8 +536,8 @@ Le tabelle seguenti riassumono i valori medi delle metriche nei due scenari.
             \textbf{Coppia} & \textbf{SSIM} & \textbf{Pearson} & \textbf{Spearman} & \textbf{Cosine} & \textbf{MAE} & \textbf{n} \\
             \hline
             Saliency–IG     & 0.263         & 0.529            & 0.194             & 0.651           & 0.211        & 100        \\
-            Saliency–LIME   & 0.213         & 0.477            & 0.424             & 0.658           & 0.151        & 100        \\
-            IG–LIME         & 0.265         & 0.430            & 0.224             & 0.725           & 0.185        & 100        \\
+            Saliency–LIME   & 0.178         & 0.468            & 0.392             & 0.663           & 0.177        & 100        \\
+            IG–LIME         & 0.247         & 0.421            & 0.224             & 0.780           & 0.167        & 100        \\
             \hline
       \end{tabular}
       \caption{Similarità \emph{intra-modello}: confronto tra metodi diversi sullo stesso modello (medie; dallo script non sono disponibili le deviazioni standard).}
@@ -378,7 +553,7 @@ Le tabelle seguenti riassumono i valori medi delle metriche nei due scenari.
             \hline
             Saliency        & 0.439         & 0.612            & 0.688             & 0.727           & 0.069        & 450        \\
             IG              & 0.711         & 0.723            & 0.516             & 0.970           & 0.083        & 450        \\
-            LIME            & 0.732         & 0.906            & 0.647             & 0.936           & 0.079        & 450        \\
+            LIME            & 0.639         & 0.864            & 0.541             & 0.929           & 0.093        & 450        \\
             \hline
       \end{tabular}
       \caption{Similarità \emph{inter-modello}: stesso metodo applicato a modelli diversi del Rashomon set (medie; dallo script non sono disponibili le deviazioni standard).}
@@ -386,13 +561,13 @@ Le tabelle seguenti riassumono i valori medi delle metriche nei due scenari.
 \end{table}
 
 \begin{figure}[h!]
-    \centering
-    \includegraphics[width=\textwidth]{images/visualizzazione (2).png}
-    \caption{Esempi di mappe di attribuzione per 10 modelli del Rashomon set su alcune immagini di test (MNIST). 
-    Ogni riga corrisponde a una diversa immagine originale, seguita dalle spiegazioni generate con Saliency, Integrated Gradients (IG) e LIME.
-    Si osserva come le spiegazioni siano generalmente più coerenti \textbf{tra modelli} usando lo stesso metodo (colonne verticali), 
-    mentre differenze più marcate emergono \textbf{tra metodi} sullo stesso modello (blocchi orizzontali).}
-    \label{fig:similarity_examples}
+      \centering
+      \includegraphics[width=\textwidth]{images/visualizzazione (2).png}
+      \caption{Esempi di mappe di attribuzione per 10 modelli del Rashomon set su alcune immagini di test (MNIST).
+            Ogni riga corrisponde a una diversa immagine originale, seguita dalle spiegazioni generate con Saliency, Integrated Gradients (IG) e LIME.
+            Si osserva come le spiegazioni siano generalmente più coerenti \textbf{tra modelli} usando lo stesso metodo (colonne verticali),
+            mentre differenze più marcate emergono \textbf{tra metodi} sullo stesso modello (blocchi orizzontali).}
+      \label{fig:similarity_examples}
 \end{figure}
 
 \subsection{Interpretazione}
@@ -478,6 +653,24 @@ Più il valore AOPC è alto, più la rimozione delle feature considerate
 importanti provoca un crollo rapido della confidenza: un segno di elevata
 fedeltà della spiegazione.
 
+\begin{lstlisting}[caption={Procedura MoRF e calcolo AOPC}, label={lst:morf_aopc}]
+function calcola_aopc(modello, immagine, mappa_spiegazione, steps=10):
+    probas = []
+    
+    indici_importanti = ordina_pixel_per_rilevanza(mappa_spiegazione)
+    
+    for step in 0 to steps:
+        immagine_modificata = maschera_pixel(immagine, indici_importanti, step)
+        confidenza = predici_confidenza(modello, immagine_modificata)
+        aggiungi(probas, confidenza)
+    
+    conf_iniziale = probas[0]
+    differenze = [conf_iniziale - p for p in probas]
+    aopc = media(differenze)
+    
+    return aopc, probas
+\end{lstlisting}
+
 \subsection{Risultati AOPC}
 \begin{table}[h!]
       \centering
@@ -486,7 +679,7 @@ fedeltà della spiegazione.
             \hline
             \textbf{Metodo}      & \textbf{AOPC (media $\pm$ std)} \\
             \hline
-            LIME                 & $0.8080 \pm 0.0825$             \\
+            LIME                 & $0.7993 \pm 0.0948$             \\
             Integrated Gradients & $0.7511 \pm 0.1873$             \\
             Saliency             & $0.6568 \pm 0.1495$             \\
             \hline
@@ -505,8 +698,8 @@ I risultati indicano:
 
 \noindent
 Questi valori vanno letti con attenzione. LIME, pur essendo il più rumoroso nelle visualizzazioni e meno coerente tra modelli, ottiene il punteggio AOPC più alto.
-Ciò indica che, quando individua una feature come rilevante, questa ha effettivamente un impatto forte sulla decisione del modello.
-Integrated Gradients si colloca appena sotto, bilanciando fedeltà elevata e coerenza inter-modello: un compromesso interessante in scenari dove entrambe le proprietà sono desiderabili.
+Ciò indica che, quando individua una feature come rilevante, questa ha effettivamente un impatto forte sulla decisione del modello.\\
+Integrated Gradients si colloca appena sotto, bilanciando fedeltà elevata e coerenza inter-modello: un compromesso interessante in scenari dove entrambe le proprietà sono desiderabili.\\
 Saliency mostra valori più bassi, suggerendo che alcune feature evidenziate non sono sempre cruciali per la classificazione.
 
 È importante sottolineare che un AOPC alto non implica necessariamente una spiegazione più interpretabile o comprensibile per l’utente umano: misura solo la capacità della spiegazione di identificare feature che, se rimosse, fanno crollare la confidenza del modello.
@@ -524,5 +717,8 @@ L’analisi combinata di similarità e fedeltà porta a diverse osservazioni:
       \item Saliency è meno performante in entrambi gli aspetti, suggerendo una minore
             utilità pratica nel contesto MNIST.
 \end{itemize}
+
+\bibliographystyle{plainnat}
+\bibliography{references_base}
 
 \end{document}
