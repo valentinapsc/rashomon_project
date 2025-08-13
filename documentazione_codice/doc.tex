@@ -216,6 +216,7 @@ le raccomandazioni di \citet{pineau2020improving}:
 \end{itemize}
 
 \subsection{Scelte implementative}
+\label{sec:scelte_implementative}
 
 Gli esperimenti sono stati condotti interamente su \textbf{CPU}, scelta che ha
 avuto un impatto diretto sulle decisioni implementative. Lavorare senza GPU ha
@@ -379,68 +380,88 @@ La costruzione del Rashomon set serve a due scopi principali:
 \subsection{Approfondimento: equivalenza tra modelli}
 Nel contesto di questo lavoro, due modelli sono considerati equivalenti se
 soddisfano la condizione di soglia sull’accuratezza definita sopra. Questa
-scelta è in linea con la letteratura, in quanto:
+scelta è in linea con la definizione originaria di \emph{Rashomon set}
+\citep{fisher2019all}, secondo cui l’insieme comprende modelli con prestazioni
+quasi ottimali rispetto al miglior modello ottenuto. L’adozione di tale
+criterio permette di:
 \begin{itemize}
-      \item Rispetta la definizione originaria di Rashomon set come insieme di modelli con
-            prestazioni quasi ottimali.
-      \item Permette di esplorare la diversità interna tra modelli che, in termini
-            predittivi, sembrano “uguali”.
+      \item Rispettare la formulazione teorica riportata in letteratura, in cui il Rashomon
+            set è visto come una regione nello spazio dei modelli che contiene tutte le
+            soluzioni con accuratezza comparabile \citep{mueller2023rashomon}.
+      \item Esplorare la diversità interna tra modelli che, in termini predittivi, sembrano
+            “uguali”, ma che possono differire nelle rappresentazioni interne e quindi
+            nelle spiegazioni \citep{leventi2023consistency}.
 \end{itemize}
 
 \subsection{Perché utilizzare l’early stopping}
-L’\emph{early stopping} è stato adottato per due motivi principali:
+L’\emph{early stopping} \citep{prechelt1998early} è stato adottato per due
+motivi principali:
 \begin{itemize}
       \item \textbf{Evitare l’overfitting}: interrompendo l’addestramento quando le prestazioni di validazione smettono di migliorare, si evita che il modello memorizzi il training set perdendo capacità di generalizzazione.
-      \item \textbf{Equità nel confronto}: applicando la stessa regola a tutti i modelli, ciascun membro del Rashomon set viene selezionato nelle condizioni di miglior equilibrio tra bias e varianza.
+      \item \textbf{Equità nel confronto}: applicando la stessa regola a tutti i modelli, ciascun membro del Rashomon set viene selezionato nelle condizioni di miglior equilibrio tra bias e varianza, come raccomandato nelle buone pratiche di confronto tra modelli \citep{goodfellow2016deep}.
 \end{itemize}
 
 Questo approccio assicura che la variabilità osservata nelle spiegazioni non
 sia dovuta a un diverso grado di overfitting, ma a reali differenze nei
-percorsi di apprendimento.
+percorsi di apprendimento. Inoltre, fissando i \emph{random seed} per tutte le
+componenti stocastiche (inizializzazione dei pesi, shuffle dei dati, generatori
+casuali di librerie esterne) \citep{reimers2017reporting}, è possibile
+distinguere la variabilità dovuta al caso da quella legata a differenze
+strutturali nei modelli o nelle spiegazioni.
 
-\subsection{Riproducibilità dei risultati}
-La replicabilità degli esperimenti è stata garantita mediante:
+\subsection{Scelta dell’ottimizzatore: Adam.}
+Per l’addestramento di tutte le reti neurali è stato utilizzato l’ottimizzatore
+\emph{Adam} (\emph{Adaptive Moment Estimation}) \citep{kingma2014adam},
+ampiamente adottato in ambito \emph{deep learning} per la sua capacità di
+combinare i vantaggi di AdaGrad e RMSProp. Adam adatta dinamicamente il tasso
+di apprendimento per ciascun parametro in base alle stime dei momenti del
+gradiente, permettendo:
 \begin{itemize}
-      \item Inizializzazione di ciascun modello con un \emph{seed} diverso, per generare
-            percorsi di apprendimento unici.
-      \item Fissaggio dei \emph{random seed} di NumPy e PyTorch, così da rendere
-            deterministico il processo di addestramento.
+      \item Convergenza più rapida rispetto a metodi a tasso di apprendimento fisso.
+      \item Maggiore stabilità anche in presenza di gradienti rumorosi, come avviene nei
+            dati di immagini con variazioni locali.
+      \item Ridotta necessità di un fine-tuning manuale del \emph{learning rate}.
 \end{itemize}
-
-In questo modo, è possibile distinguere la variabilità dovuta al caso da quella
-legata a differenze strutturali nei modelli o nelle spiegazioni.
+L’uso di Adam ha reso possibile mantenere tempi di addestramento contenuti pur garantendo
+una buona qualità della convergenza, aspetto particolarmente rilevante data
+l’esecuzione esclusivamente su CPU.
 
 \section{Metodi di spiegazione adottati}
 
 Una volta selezionato il \emph{Rashomon set} dei modelli, il passo successivo
 consiste nell’analizzare come ciascun modello giunge alle proprie decisioni.
 Per questo scopo sono stati utilizzati tre metodi di spiegazione, scelti per
-rappresentare sia approcci \emph{gradient-based} che \emph{model-agnostic}.
+rappresentare sia approcci \emph{gradient-based} che \emph{model-agnostic}
+\cite{adadi2018survey,guidotti2018survey}.
 
 \subsection{Saliency}
-Il metodo della \emph{saliency map} è uno dei più semplici e diffusi. Calcola
-la derivata della probabilità (o della logit) assegnata dal modello alla classe
-target rispetto a ciascun pixel dell’immagine di input. I pixel associati ai
-valori assoluti più elevati sono considerati più importanti per la decisione.
-Questo metodo è apprezzato per la sua immediatezza, ma è noto per essere
-sensibile al rumore e all’inizializzazione dei pesi del modello.
+Il metodo della \emph{saliency map} \cite{simonyan2013deep,samek2016evaluating}
+è uno dei più semplici e diffusi. Calcola la derivata della probabilità (o
+della logit) assegnata dal modello alla classe target rispetto a ciascun pixel
+dell’immagine di input. I pixel associati ai valori assoluti più elevati sono
+considerati più importanti per la decisione. Questo metodo è apprezzato per la
+sua immediatezza, ma è noto per essere sensibile al rumore e
+all’inizializzazione dei pesi del modello.
 
 \subsection{Integrated Gradients (IG)}
-Gli \emph{Integrated Gradients} migliorano l’approccio delle saliency map,
-correggendone alcune limitazioni. Calcolano il contributo di ogni feature
-effettuando una media dei gradienti lungo un percorso che va da una
-\emph{baseline} (nel nostro caso, immagine nulla) fino all’immagine reale.
-Questo consente di ottenere spiegazioni più stabili e coerenti, meno
-influenzate da piccole variazioni nei dati o nei parametri del modello.
+Gli \emph{Integrated Gradients} \cite{sundararajan2017axiomatic} migliorano
+l’approccio delle saliency map, correggendone alcune limitazioni. Calcolano il
+contributo di ogni feature effettuando una media dei gradienti lungo un
+percorso che va da una \emph{baseline} (nel nostro caso, immagine nulla) fino
+all’immagine reale. Questo consente di ottenere spiegazioni più stabili e
+coerenti, meno influenzate da piccole variazioni nei dati o nei parametri del
+modello.
 
 \subsection{LIME}
 Il metodo \emph{LIME} (\emph{Local Interpretable Model-agnostic Explanations})
-genera nuove istanze di input perturbate (ad esempio, oscurando casualmente
-parti dell’immagine) e osserva come cambia la predizione del modello.
-Successivamente, addestra un modello interpretabile locale (ad esempio una
-regressione lineare) per stimare quali feature hanno avuto il maggiore impatto
-sulla decisione del modello. Nel caso di MNIST, le perturbazioni sono
-effettuate a livello di singolo pixel, senza segmentazione in super-pixel.
+\cite{ribeiro2016lime} genera nuove istanze di input perturbate (ad esempio,
+oscurando casualmente parti dell’immagine) e osserva come cambia la predizione
+del modello. Successivamente, addestra un modello interpretabile locale (ad
+esempio una regressione lineare) per stimare quali feature hanno avuto il
+maggiore impatto sulla decisione del modello. Nel caso di MNIST, le
+perturbazioni sono state effettuate non a livello di singolo pixel ma
+aggregando in blocchi $4\times4$ per ridurre il rumore e i tempi di calcolo
+(sezione~\ref{sec:scelte_implementative}).
 
 \begin{lstlisting}[caption={Generazione delle spiegazioni}, label={lst:xai_generation}]
 function genera_spiegazioni(modello, immagine, etichetta_vera):
@@ -461,23 +482,25 @@ function genera_spiegazioni(modello, immagine, etichetta_vera):
 La combinazione di questi tre metodi consente di confrontare:
 \begin{itemize}
       \item Approcci \emph{gradient-based} (Saliency, IG) e approcci \emph{model-agnostic}
-            (LIME).
+            (LIME) \citep{simonyan2014deep,sundararajan2017axiomatic,ribeiro2016lime}.
       \item Metodi semplici e veloci con tecniche più robuste e computazionalmente costose.
       \item Stabilità delle spiegazioni e capacità di cogliere diversi aspetti
-            dell’importanza delle feature.
+            dell’importanza delle feature \citep{samek2016evaluating,guidotti2018survey}.
 \end{itemize}
 
 \subsection{Gradient-based vs Model-agnostic}
 I metodi di spiegazione \emph{gradient-based} sfruttano direttamente la
 struttura interna del modello: calcolano come varia la predizione rispetto a
 piccole modifiche delle feature in input, utilizzando le derivate calcolate
-tramite \emph{backpropagation}. Questi metodi sono veloci e, per modelli
-differenziabili come le reti neurali, forniscono indicazioni precise sulle
-feature che guidano la decisione.
+tramite \emph{backpropagation}
+\citep{simonyan2014deep,sundararajan2017axiomatic}. Questi metodi sono veloci
+e, per modelli differenziabili come le reti neurali, forniscono indicazioni
+precise sulle feature che guidano la decisione.
 
 I metodi \emph{model-agnostic}, invece, trattano il modello come una “scatola
 nera”: non richiedono accesso ai pesi o ai gradienti, ma solo la possibilità di
-effettuare predizioni su input modificati. Questo li rende molto flessibili
+effettuare predizioni su input modificati
+\citep{ribeiro2016lime,guidotti2018survey}. Questo li rende molto flessibili
 (applicabili a qualsiasi modello), ma spesso più lenti e meno stabili, poiché
 si basano su approssimazioni locali.
 
@@ -490,7 +513,8 @@ Nel contesto di un \emph{Rashomon set}, questa domanda diventa cruciale:
 modelli diversi, ma ugualmente accurati, arrivano alle stesse conclusioni per
 motivi simili, o per motivi profondamente diversi? Misurare la similarità tra
 spiegazioni è un passo fondamentale per capire la robustezza e la stabilità
-delle interpretazioni fornite dai metodi di \emph{eXplainable AI} (XAI).
+delle interpretazioni fornite dai metodi di \emph{eXplainable AI} (XAI)
+\citep{samek2016evaluating, mueller2023rashomon}.
 
 \subsection{Metriche adottate}
 Per trasformare un concetto qualitativo come ``somiglianza visiva'' in numeri,
@@ -498,32 +522,43 @@ Per trasformare un concetto qualitativo come ``somiglianza visiva'' in numeri,
 tra due mappe di importanza:
 
 \begin{itemize}
-      \item \textbf{Structural Similarity Index (SSIM)} — valuta quanto due mappe siano simili in termini di struttura, considerando luminanza, contrasto e distribuzione spaziale. Un SSIM vicino a 1 indica che le due spiegazioni hanno pattern strutturali quasi identici.
+      \item \textbf{Structural Similarity Index (SSIM)} — valuta quanto due mappe siano simili in termini di struttura, considerando luminanza, contrasto e distribuzione spaziale. Un SSIM vicino a 1 indica che le due spiegazioni hanno pattern strutturali quasi identici \citep{wang2004ssim}.
       \item \textbf{Pearson correlation} — misura la correlazione lineare tra i valori di importanza, utile per capire se i valori crescono e decrescono insieme, indipendentemente dall’ordine dei pixel.
       \item \textbf{Spearman correlation} — analizza la correlazione tra i ranghi, quindi l’ordine relativo delle feature più importanti, anche se le scale numeriche sono diverse.
-      \item \textbf{Cosine similarity} — confronta la direzione dei vettori di importanza, ignorando la loro lunghezza: due spiegazioni che mettono in evidenza le stesse zone avranno un valore vicino a 1, anche se una è “più intensa” dell’altra.
+      \item \textbf{Cosine similarity} — confronta la direzione dei vettori di importanza, ignorando la loro lunghezza: due spiegazioni che mettono in evidenza le stesse zone avranno un valore vicino a 1, anche se una è ``più intensa'' dell’altra.
       \item \textbf{Mean Absolute Error (MAE)} — fornisce una misura diretta della differenza media assoluta nei valori di importanza; più è basso, più le mappe sono simili in valore assoluto.
 \end{itemize}
 
 La scelta di queste metriche consente di catturare diverse sfaccettature della
 similarità: dalla struttura globale all’ordine delle feature, fino alla
-corrispondenza numerica esatta.
+corrispondenza numerica esatta \citep{leventi2023consistency,
+      samek2016evaluating}.
 
 \subsection{Procedura di confronto}
 Il confronto è stato condotto calcolando le metriche per ogni immagine del test
-set e per ogni coppia di spiegazioni, in due scenari distinti:
+set e per ogni coppia di spiegazioni, considerando due scenari distinti
+\citep{bhatt2021evaluating, mueller2023rashomon, leventi2023consistency,
+      krishna2022disagreement}:
 
 \begin{enumerate}
-      \item \textbf{Intra-modello} — confronto tra metodi diversi applicati allo stesso modello. Qui si misura la coerenza tra approcci di spiegazione differenti: se producono mappe simili, il modello è interpretato nello stesso modo indipendentemente dal metodo.
-      \item \textbf{Inter-modello} — confronto dello stesso metodo applicato a modelli diversi all’interno del \emph{Rashomon set}. In questo caso si valuta la stabilità del metodo rispetto a variazioni nella struttura interna del modello.
+      \item \textbf{Intra-modello} — confronto tra metodi diversi applicati allo stesso modello.
+            In questo scenario si misura la coerenza tra approcci di spiegazione differenti:
+            se producono mappe simili, significa che il modello è interpretato in modo coerente
+            indipendentemente dal metodo XAI utilizzato.
+
+      \item \textbf{Inter-modello} — confronto dello stesso metodo applicato a modelli diversi
+            appartenenti al \emph{Rashomon set}.
+            Qui si valuta la stabilità del metodo rispetto a variazioni nella struttura interna
+            e nei parametri del modello, mantenendo invariato l’approccio di spiegazione.
 \end{enumerate}
 
 Le attribuzioni sono calcolate sempre rispetto alla \textbf{classe vera}
-(\textit{true label}). Questa scelta è stata fatta per garantire coerenza con
-il \emph{ground truth} ed evitare che errori di classificazione alterino il
-confronto. Tuttavia, rappresenta una potenziale minaccia alla validità esterna:
-in scenari reali, la classe vera potrebbe non essere disponibile, e il
-comportamento rispetto alla classe predetta potrebbe differire.
+(\textit{true label}). Questa scelta è stata adottata per garantire coerenza
+con il \emph{ground truth} ed evitare che eventuali errori di classificazione
+alterino il confronto. Tuttavia, essa rappresenta una potenziale minaccia alla
+validità esterna: in scenari reali, la classe vera potrebbe non essere
+disponibile e il comportamento del metodo rispetto alla classe predetta
+potrebbe differire in modo significativo.
 
 \subsection{Risultati quantitativi}
 Le tabelle seguenti riassumono i valori medi delle metriche nei due scenari.
@@ -573,35 +608,31 @@ Le tabelle seguenti riassumono i valori medi delle metriche nei due scenari.
 \subsection{Interpretazione}
 I valori mostrano una tendenza chiara:
 \begin{itemize}
-      \item La similarità \textbf{inter-modello} è molto alta per tutte le metriche,
-            segnalando che un singolo metodo tende a produrre spiegazioni coerenti tra
-            modelli diversi del Rashomon set.
-      \item La similarità \textbf{intra-modello} è significativamente più bassa: metodi
-            diversi, anche sullo stesso modello, producono spiegazioni tra loro divergenti.
+      \item La similarità \textbf{inter-modello} è più alta per tutte le metriche rispetto
+            all'intra-modello, indicando che un singolo metodo tende a produrre spiegazioni
+            coerenti tra modelli diversi del Rashomon set.
+      \item La similarità \textbf{intra-modello} è sensibilmente più bassa: metodi diversi,
+            anche sullo stesso modello, producono spiegazioni tra loro divergenti.
 \end{itemize}
 
-Guardando ai risultati, emerge una tendenza chiara e coerente con quanto
-riportato in letteratura: la similarità \textbf{inter-modello} è
-sistematicamente più alta della \textbf{intra-modello}, indipendentemente dalla
-metrica utilizzata. Questo significa che, una volta scelto un metodo di
-spiegazione, le mappe generate rimangono relativamente stabili anche se il
-modello cambia — almeno all’interno del Rashomon set considerato. Ad esempio,
-LIME raggiunge valori di Pearson sopra $0.90$ tra modelli diversi, mentre la
-stessa metrica scende a circa $0.47$–$0.53$ quando si confronta LIME con altri
-metodi sullo stesso modello.\\
+Guardando ai risultati, emerge una tendenza coerente con quanto riportato in
+letteratura: la similarità \textbf{inter-modello} è sistematicamente più alta
+della \textbf{intra-modello}, indipendentemente dalla metrica utilizzata. Ad
+esempio, LIME raggiunge valori di Pearson pari a $0.864$ tra modelli diversi,
+mentre la stessa metrica scende a $0.421$–$0.529$ quando si confronta LIME con
+altri metodi sullo stesso modello.
 
 La situazione si inverte quando cambiamo il metodo: qui le similarità calano
-drasticamente, con SSIM intorno a $0.21$–$0.26$ e correlazioni Spearman che, in
-certi confronti, non superano $0.22$. Questi numeri confermano che la
+drasticamente, con SSIM compresi tra $0.178$ e $0.263$ e correlazioni Spearman
+che, in certi confronti, non superano $0.392$. Questi numeri confermano che la
 \emph{scelta del metodo di spiegazione} è il fattore che più influenza forma,
-intensità e posizionamento delle regioni considerate rilevanti. In altre
-parole, i metodi “dicono storie diverse” anche quando guardano lo stesso
-modello.\\
+intensità e posizionamento delle regioni considerate rilevanti.
 
-Questo suggerisce che, nel contesto analizzato, la \emph{scelta del metodo di
-      spiegazione} ha un impatto più forte sulla forma e sul contenuto della
-spiegazione rispetto alla scelta del modello, almeno all’interno del Rashomon
-set considerato.
+In altre parole, i metodi “raccontano storie diverse” anche quando osservano lo
+stesso modello. Questo suggerisce che, nel contesto analizzato, la \emph{scelta
+      del metodo di spiegazione} ha un impatto più marcato sulla forma e sul
+contenuto della spiegazione rispetto alla scelta del modello, almeno
+all’interno del Rashomon set considerato.
 
 \section{Valutare la fedeltà delle spiegazioni: MoRF e AOPC}
 
