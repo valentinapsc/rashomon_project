@@ -644,10 +644,10 @@ guidano la decisione del modello?
 
 \subsection{Procedura MoRF}
 Il metodo \emph{Most Relevant First} (MoRF) è un approccio standard in
-letteratura per testare la fedeltà delle mappe di importanza. L’idea è
-semplice: se le feature indicate come importanti sono davvero decisive,
-rimuoverle dovrebbe ridurre rapidamente la confidenza del modello nella classe
-target.
+letteratura per testare la fedeltà delle mappe di importanza
+\citep{samek2016evaluating,samek2017explainable}. L’idea è semplice: se le
+feature indicate come importanti sono davvero decisive, rimuoverle dovrebbe
+ridurre rapidamente la confidenza del modello nella classe target.
 
 Il procedimento seguito è stato il seguente:
 \begin{enumerate}
@@ -667,7 +667,7 @@ Il procedimento seguito è stato il seguente:
 \subsection{AOPC: Area Over the Perturbation Curve}
 Per riassumere in un solo numero la qualità di una spiegazione, è stata
 utilizzata la metrica \textbf{AOPC} (\emph{Area Over the Perturbation Curve}),
-calcolata come:
+introdotta da \citet{samek2016evaluating}, calcolata come:
 
 \[
       \mathrm{AOPC} = \frac{1}{K} \sum_{k=1}^K \left[ f(x) - f(x^{(k)}) \right]
@@ -720,34 +720,92 @@ function calcola_aopc(modello, immagine, mappa_spiegazione, steps=10):
 \end{table}
 
 \noindent
-I risultati indicano:
+I risultati mostrano che:
 \begin{itemize}
-      \item \textbf{LIME} provoca il decadimento più rapido della confidenza media, segno che le feature che evidenzia sono spesso effettivamente rilevanti per il modello.
+      \item \textbf{LIME} provoca il decadimento più rapido della confidenza media, segno che le feature evidenziate sono spesso effettivamente rilevanti per il modello.
       \item \textbf{Integrated Gradients} ottiene un valore intermedio, combinando buona fedeltà con alta coerenza inter-modello.
-      \item \textbf{Saliency} ha valori più bassi, suggerendo che le feature evidenziate non sempre sono decisive per la classificazione.
+      \item \textbf{Saliency} registra valori più bassi, indicando che le feature evidenziate non sempre sono decisive per la classificazione.
 \end{itemize}
 
 \noindent
-Questi valori vanno letti con attenzione. LIME, pur essendo il più rumoroso nelle visualizzazioni e meno coerente tra modelli, ottiene il punteggio AOPC più alto.
-Ciò indica che, quando individua una feature come rilevante, questa ha effettivamente un impatto forte sulla decisione del modello.\\
-Integrated Gradients si colloca appena sotto, bilanciando fedeltà elevata e coerenza inter-modello: un compromesso interessante in scenari dove entrambe le proprietà sono desiderabili.\\
-Saliency mostra valori più bassi, suggerendo che alcune feature evidenziate non sono sempre cruciali per la classificazione.
+Tali risultati vanno interpretati con cautela. LIME, pur essendo più rumoroso nelle visualizzazioni e meno coerente tra modelli, ottiene il punteggio AOPC più alto. Questo suggerisce che, quando individua una feature come rilevante, essa ha un impatto marcato sulla decisione del modello. \\
+Integrated Gradients si colloca leggermente sotto, offrendo un equilibrio tra fedeltà elevata e coerenza inter-modello: un compromesso interessante in scenari dove entrambe le proprietà sono desiderabili. \\
+Saliency, infine, mostra valori più bassi, segnalando che alcune feature evidenziate potrebbero non essere cruciali per la classificazione.
 
-È importante sottolineare che un AOPC alto non implica necessariamente una spiegazione più interpretabile o comprensibile per l’utente umano: misura solo la capacità della spiegazione di identificare feature che, se rimosse, fanno crollare la confidenza del modello.
-Inoltre, i valori dipendono da scelte implementative come la baseline di mascheramento (media immagine) e, nel caso di LIME, dalla granularità delle perturbazioni (blocchi $4\times4$) e dal numero di campioni, fattori che influenzano sensibilmente il risultato.
+È importante notare che un AOPC elevato non implica necessariamente maggiore interpretabilità per l’utente umano: misura soltanto la capacità della spiegazione di individuare feature la cui rimozione comporta un rapido calo di confidenza del modello. Inoltre, i valori sono influenzati da scelte implementative come la baseline di mascheramento (media immagine) e, nel caso di LIME, dalla granularità delle perturbazioni (blocchi $4\times4$) e dal numero di campioni utilizzati.
 
-\subsection{Conclusioni}
-L’analisi combinata di similarità e fedeltà porta a diverse osservazioni:
+\section{Discussione e implicazioni}
+
+L’analisi ha mostrato che, nel contesto di un \emph{Rashomon set}, le
+differenze tra metodi di spiegazione possono risultare più marcate di quelle
+tra modelli ugualmente accurati. Questo rafforza l’idea che la scelta del
+metodo XAI sia cruciale almeno quanto quella dell’architettura del modello,
+quando l’obiettivo è comprendere le decisioni di un sistema di apprendimento
+automatico.
+
+\subsection{Sintesi dei risultati principali}
 \begin{itemize}
-      \item La variabilità intra-modello è maggiore di quella inter-modello: il metodo di
-            spiegazione influenza più del modello stesso.
-      \item LIME eccelle in termini di AOPC, ma soffre di maggiore variabilità e
-            rumorosità, specialmente tra modelli diversi.
-      \item Integrated Gradients offre un buon compromesso: alta coerenza tra modelli e
-            fedeltà elevata.
-      \item Saliency è meno performante in entrambi gli aspetti, suggerendo una minore
-            utilità pratica nel contesto MNIST.
+      \item La \textbf{variabilità intra-modello} è risultata più elevata della variabilità
+            inter-modello, segnalando che metodi diversi possono produrre interpretazioni
+            significativamente differenti anche sullo stesso modello.
+      \item \textbf{LIME} ha mostrato la fedeltà più alta (AOPC), ma a costo di minore coerenza e maggiore rumorosità.
+      \item \textbf{Integrated Gradients} ha offerto un buon compromesso tra stabilità e fedeltà, rendendolo adatto a scenari in cui entrambe le proprietà siano importanti.
+      \item \textbf{Saliency} ha avuto prestazioni più basse in entrambe le metriche, suggerendo affidabilità limitata nel contesto MNIST e con configurazione base.
 \end{itemize}
+
+\subsection{Implicazioni pratiche}
+I risultati suggeriscono che:
+\begin{enumerate}
+      \item La scelta del metodo XAI deve considerare sia la stabilità rispetto a
+            variazioni del modello sia la fedeltà rispetto alla decisione effettiva, non
+            solo la leggibilità visiva.
+      \item In applicazioni critiche (es. medicina, finanza) può essere opportuno combinare
+            più metodi per verificare la consistenza delle spiegazioni.
+      \item Il \emph{Rashomon set} si rivela uno strumento efficace per validare la
+            robustezza delle spiegazioni in scenari realistici, dove più modelli
+            equivalenti possono coesistere.
+\end{enumerate}
+
+\subsection{Limiti e sviluppi futuri}
+Le principali limitazioni riguardano:
+\begin{itemize}
+      \item l’uso di un dataset semplice (MNIST), che non riflette la complessità di domini
+            reali;
+      \item l’impiego di una sola architettura, che riduce la generalizzabilità dei
+            risultati;
+      \item l’analisi di un numero limitato di metodi XAI.
+\end{itemize}
+
+Lavori futuri potrebbero includere l’estensione a dataset più complessi (es.
+CIFAR-10, ImageNet), il confronto tra architetture differenti, l’inclusione di
+metodi più recenti (Grad-CAM, SHAP) e l’uso di metriche \emph{user-centered}
+per valutare anche l’efficacia comunicativa delle spiegazioni.
+
+\section*{Conclusioni}
+
+Questo studio ha proposto un approccio sperimentale basato sul \emph{Rashomon
+      set} per valutare la robustezza e la fedeltà delle spiegazioni fornite da
+diversi metodi XAI. Il workflow ha previsto:
+\begin{itemize}
+      \item la costruzione di un insieme di modelli equivalenti in accuratezza;
+      \item la generazione di spiegazioni tramite Saliency, Integrated Gradients e LIME;
+      \item la valutazione della similarità (SSIM, Pearson, Spearman, Cosine, MAE) e della
+            fedeltà (MoRF, AOPC).
+\end{itemize}
+
+L’analisi ha evidenziato che:
+\begin{enumerate}
+      \item la variabilità dovuta al metodo è maggiore di quella dovuta al modello;
+      \item LIME eccelle in fedeltà ma presenta minore coerenza;
+      \item Integrated Gradients bilancia stabilità e fedeltà;
+      \item Saliency risulta meno performante in entrambi gli aspetti.
+\end{enumerate}
+
+In sintesi, la robustezza delle spiegazioni non può essere assunta a priori e
+deve essere verificata sperimentalmente. L’approccio basato sul \emph{Rashomon
+      set} fornisce un quadro metodologico utile e riproducibile per indagare tali
+aspetti, ponendo le basi per futuri studi su dataset più complessi,
+architetture eterogenee e metodi di spiegazione avanzati.
 
 \bibliographystyle{plainnat}
 \bibliography{references_base}
