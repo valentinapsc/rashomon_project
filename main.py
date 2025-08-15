@@ -453,3 +453,38 @@ def plot_explanations_grid(
     plt.show()
 
 plot_explanations_grid(explanations_all, sample_imgs, sample_labels, methods=['saliency', 'ig', 'lime'])
+
+# === CALCOLO E PLOT DELLE CURVE MORF MEDIE ===
+
+avg_curves = {m: np.zeros(STEPS_MORF + 1) for m in EXPL_METHODS}
+counts = {m: 0 for m in EXPL_METHODS}
+
+for model_idx, model in enumerate(rashomon_models):
+    model.eval()
+    for img_idx in range(SAMPLE_SIZE):
+        img = sample_imgs[img_idx]
+        label = sample_labels[img_idx].item()
+        for method in EXPL_METHODS:
+            exp = explanations_all[model_idx]['explanations'][img_idx]['explanations'][method]
+            _, probas = morf_curve_aopc(model, img, exp, label, steps=STEPS_MORF)
+            avg_curves[method] += np.array(probas)
+            counts[method] += 1
+
+# Media sulle immagini e modelli
+for m in EXPL_METHODS:
+    avg_curves[m] /= counts[m]
+
+# --- Plot ---
+steps = np.linspace(0, 100, STEPS_MORF + 1)  # % feature rimosse
+plt.figure(figsize=(6, 4))
+for method in EXPL_METHODS:
+    plt.plot(steps, avg_curves[method], marker='o', label=method.capitalize())
+
+plt.xlabel("Percentuale di feature rimosse")
+plt.ylabel("Probabilità classe corretta")
+plt.title("Curve MoRF medie")
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+plt.savefig("morf_curves.png", dpi=300)  # Salva immagine per LaTeX
+plt.show()
