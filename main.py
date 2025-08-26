@@ -325,27 +325,33 @@ for img_idx in tqdm(range(SAMPLE_SIZE)):
                 
 # Stampa risultati medi
 # ---- INTRA: tra metodi, stesso modello (SOLO COPPIE) ----
-print("\nRisultati medi similarità INTRA-modello (tra metodi, stesso modello):")
+print("\nRisultati similarità INTRA-modello (tra metodi, stesso modello):")
 pair_keys = [f"{m1}-{m2}" for m1, m2 in combinations(EXPL_METHODS, 2)]
 for key in pair_keys:
     print(f"{key}:")
     for metric in SIM_METRICS:
-        vals = similarity_results[key]['same_model'][metric]
-        if len(vals) > 0 and not np.isnan(np.nanmean(vals)):
-            print(f"  {metric}: {np.nanmean(vals):.3f} (n={len(vals)})")
+        arr = np.array(similarity_results[key]['same_model'][metric], dtype=float)
+        if arr.size > 0 and not np.isnan(np.nanmean(arr)):
+            m = np.nanmean(arr)
+            s = np.nanstd(arr)
+            n = np.sum(~np.isnan(arr))
+            print(f"  {metric}: {m:.3f} ± {s:.3f} (n={n})")
         else:
-            print(f"  {metric}: n/d")
+            print("  {0}: n/d".format(metric))
 
 # ---- INTER: stesso metodo, modelli diversi (SOLO METODI) ----
-print("\nRisultati medi similarità INTER-modello (stesso metodo, modelli diversi):")
+print("\nRisultati similarità INTER-modello (stesso metodo, modelli diversi):")
 for method in EXPL_METHODS:
     print(f"{method}:")
     for metric in SIM_METRICS:
-        vals = similarity_results[method]['diff_model'][metric]
-        if len(vals) > 0 and not np.isnan(np.nanmean(vals)):
-            print(f"  {metric}: {np.nanmean(vals):.3f} (n={len(vals)})")
+        arr = np.array(similarity_results[method]['diff_model'][metric], dtype=float)
+        if arr.size > 0 and not np.isnan(np.nanmean(arr)):
+            m = np.nanmean(arr)
+            s = np.nanstd(arr)
+            n = np.sum(~np.isnan(arr))
+            print(f"  {metric}: {m:.3f} ± {s:.3f} (n={n})")
         else:
-            print(f"  {metric}: n/d")
+            print("  {0}: n/d".format(metric))
 
 
 # VALUTAZIONE QUALITÀ (MoRF)
@@ -407,8 +413,11 @@ for model_idx, model in enumerate(rashomon_models):
 # Output: media e std AOPC per ogni metodo
 print("\nRisultati AOPC (più alto = spiegazione più efficace):")
 for method in EXPL_METHODS:
-    aopcs = quality_results[method]
-    print(f"- {method}: mean={np.mean(aopcs):.4f}, std={np.std(aopcs):.4f} (n={len(aopcs)})")
+    arr = np.array(quality_results[method], dtype=float)
+    m = np.nanmean(arr)
+    s = np.nanstd(arr)
+    n = np.sum(~np.isnan(arr))
+    print(f"- {method}: {m:.4f} ± {s:.4f} (n={n})")
 
 
 # VISUALIZZAZIONE

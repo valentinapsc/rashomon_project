@@ -1,32 +1,61 @@
-\documentclass{article}
-\usepackage{graphicx}
-\usepackage{float}
+\documentclass[12pt,a4paper,oneside]{report} 
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[italian]{babel}
+\usepackage{csquotes}
+
+\usepackage[a4paper,margin=3cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing  
+
+\usepackage{lmodern}    
+\usepackage{microtype}   
 
 \usepackage[numbers,sort&compress]{natbib}
 
-\usepackage{listings}
-\usepackage[utf8]{inputenc}
 \usepackage{xcolor}
+\usepackage[
+    hidelinks,          
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=blue!50!black,
+    urlcolor=blue!50!black
+]{hyperref}
 
-\usepackage{tikz}
-\usetikzlibrary{positioning,shapes.geometric,arrows.meta}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{} 
+\fancyhead[LE,RO]{\thepage}
+\fancyhead[LO]{\nouppercase{\rightmark}} 
+\fancyhead[RE]{\nouppercase{\leftmark}}  
+\setlength{\headheight}{14pt}
 
-\tikzset{
-  mybox/.style={
-    draw, rounded corners, fill=blue!10, align=center,
-    minimum height=10mm, text width=6.2cm, inner sep=4pt
-  },
-  startstop/.style={
-    draw, rounded corners, fill=red!15, align=center,
-    minimum height=10mm, text width=6.2cm, inner sep=4pt
-  },
-  decision/.style={
-    draw, diamond, aspect=2.2, fill=green!20, align=center, inner sep=1pt
-  },
-  arrow/.style={-{Stealth[length=2.4mm]}, thick}
-}
+\usepackage{titlesec}
+\titleformat{\chapter}[hang]
+  {\bfseries\LARGE}
+  {\thechapter\ \textcolor{gray}{|}}
+  {0.6em}{}
+\titlespacing*{\chapter}{0pt}{-6pt}{18pt}
+\titleformat{\section}{\large\bfseries}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
 
+\usepackage{tocloft}
+\setlength{\cftbeforechapskip}{6pt}
+\setlength{\cftbeforesecskip}{2pt}
 
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage[labelfont=bf,font=small]{caption}
+
+\usepackage{amsmath} 
+\numberwithin{figure}{chapter}
+\numberwithin{table}{chapter}
+
+\usepackage[bottom]{footmisc} 
+\setlength{\skip\footins}{12pt} 
+
+\usepackage{listings}
 \lstset{
     language=Python,
     basicstyle=\ttfamily\small,
@@ -36,7 +65,6 @@
     stringstyle=\color{red!60!black},
     showstringspaces=false,
     breaklines=true,
-    breakatwhitespace=true,
     columns=fullflexible,
     frame=single,
     numbers=left,
@@ -44,18 +72,36 @@
     numbersep=5pt
 }
 
+\usepackage{tikz}
+\usetikzlibrary{positioning,shapes.geometric,arrows.meta}
+\tikzset{
+  mybox/.style={draw, rounded corners, fill=blue!10, align=center,
+    minimum height=10mm, text width=6.2cm, inner sep=4pt},
+  startstop/.style={draw, rounded corners, fill=red!15, align=center,
+    minimum height=10mm, text width=6.2cm, inner sep=4pt},
+  decision/.style={draw, diamond, aspect=2.2, fill=green!20, align=center, inner sep=1pt},
+  arrow/.style={-{Stealth[length=2.4mm]}, thick}
+}
+
+% --- (Opzionale) Glossario/acronimi ---
+% \usepackage[acronym,toc]{glossaries}
+% \makeglossaries
+
+\setlength{\intextsep}{10pt}
+\setlength{\textfloatsep}{12pt}
+\captionsetup{width=.9\linewidth}
+
 \title{doc}
-\author{Valentina piscopo}
-\date{August 2025}
+\author{Valentina Piscopo}
+\date{Agosto 2025}
 
 \begin{document}
 
 \maketitle
-
 \tableofcontents
 \newpage
 
-\section{Introduzione}
+\chapter{Introduzione}
 
 Quando ci affidiamo ai metodi di spiegazione per i modelli di \emph{machine
       learning}, sorge una domanda cruciale: \textit{quanto sono simili le
@@ -116,10 +162,14 @@ prospettive complementari. Questa tesi adotta quindi una doppia prospettiva:
 \end{itemize}
 
 L’obiettivo finale è indagare se e come l’effetto Rashomon si manifesti non
-solo nelle predizioni, ma anche nell’interpretabilità, valutando la coerenza e
-l’affidabilità dei metodi XAI in scenari controllati.
+solo nelle predizioni, ma anche nell’interpretabilità\footnote{In letteratura
+      XAI, per interpretabilità si intende la possibilità di associare in modo
+      comprensibile le decisioni di un modello alle caratteristiche rilevanti dei
+      dati. Non va confusa con la sola \emph{fedeltà}, che riguarda invece quanto la
+      spiegazione rifletta fedelmente il funzionamento interno del modello.},
+valutando la coerenza e l’affidabilità dei metodi XAI in scenari controllati.
 
-\section{Introduzione all’implementazione sperimentale}
+\chapter{Introduzione all’implementazione sperimentale}
 
 L’esperimento è stato strutturato come una pipeline in più fasi, ciascuna con
 un obiettivo specifico, seguendo approcci già consolidati in letteratura
@@ -144,47 +194,44 @@ un obiettivo specifico, seguendo approcci già consolidati in letteratura
 \begin{figure}[htbp]
       \centering
       \footnotesize
-      \begin{tikzpicture}[node distance=8mm]
-            % Colonna sinistra
-            \node (start)   [startstop] {Dataset MNIST (train/val/test)};
-            \node (train)   [mybox, below=of start] {Addestramento di \texttt{NUM\_MODELS} CNN\\
-                  Parametri: EPOCHS, BATCH\_SIZE, PATIENCE};
-            \node (sel)     [decision, below=12mm of train] {Accuracy\textsubscript{val} $\ge$ best $-$ 1\%?};
-            \node (discard) [mybox, below=14mm of sel] {Modello scartato};
+      \begin{tikzpicture}[
+            node distance=10mm,
+            box/.style={draw, rounded corners, fill=gray!10, align=center, minimum height=9mm, text width=8.8cm, inner sep=4pt},
+            small/.style={draw, rounded corners, fill=gray!10, align=center, minimum height=9mm, text width=8.8cm, inner sep=4pt},
+            arrow/.style={-{Stealth[length=2.4mm]}, thick},
+            lbl/.style={circle, draw, fill=white, inner sep=1pt, font=\bfseries\scriptsize, yshift=6pt}
+            ]
 
-            % Colonna destra
-            \node (rashomon) [mybox, right=22mm of sel] {Rashomon set\\(modelli selezionati)};
-            \node (explain)  [mybox, below=of rashomon] {Generazione spiegazioni:\\
-                  Saliency, IG, LIME\\
-                  IG: baseline = zeri\\
-                  LIME: media immagine, \texttt{feature\_mask} 4$\times$4, $n\_\mathrm{samples}=100$};
-            \node (sim)      [mybox, below=of explain] {Calcolo similarità:\\
-                  \emph{Intra-modello} (tra metodi)\\
-                  \emph{Inter-modello} (stesso metodo)\\
-                  Metriche: SSIM, Pearson, Spearman, Cosine, MAE};
-            \node (morf)     [mybox, below=of sim] {Valutazione fedeltà (MoRF)\\
-                  Metrica: AOPC, $K=10$ step\\
-                  Baseline mascheramento: media immagine};
-            \node (results)  [startstop, below=of morf] {Risultati, tabelle, grafici, interpretazione};
+            \node (step1) [box] {Dataset MNIST \textit{(train/val/test)}};
+            \node (step2) [box, below=of step1] {Addestramento di più CNN (stessa architettura)};
+            \node (step3) [box, below=of step2] {Selezione del \textit{Rashomon set} \\ \small (modelli con accuratezza di validazione entro 1\% dal best)};
+            \node (step4) [box, below=of step3] {Generazione delle spiegazioni \\ \small Saliency \;|\; Integrated Gradients \;|\; LIME};
+            \node (step5) [box, below=of step4] {Valutazione della similarità \\ \small \emph{intra-modello} (tra metodi) \quad|\quad \emph{inter-modello} (stesso metodo) \\ \small Metriche: SSIM, Pearson, Spearman, Cosine, MAE};
+            \node (step6) [box, below=of step5] {Valutazione della fedeltà \\ \small MoRF \& AOPC};
+            \node (step7) [box, below=of step6] {Risultati \& interpretazione};
 
-            % Frecce principali
-            \draw[arrow] (start) -- (train);
-            \draw[arrow] (train) -- (sel);
-            \draw[arrow] (sel.east) -- (rashomon.west);
-            \draw[arrow] (rashomon) -- (explain);
-            \draw[arrow] (explain) -- (sim);
-            \draw[arrow] (sim) -- (morf);
-            \draw[arrow] (morf) -- (results);
+            \draw[arrow] (step1) -- (step2);
+            \draw[arrow] (step2) -- (step3);
+            \draw[arrow] (step3) -- (step4);
+            \draw[arrow] (step4) -- (step5);
+            \draw[arrow] (step5) -- (step6);
+            \draw[arrow] (step6) -- (step7);
 
-            % Freccia verso "scartato"
-            \draw[arrow] (sel.south) -- ++(0,-7mm) -- (discard.north);
+            % Etichette numerate
+            \node[lbl] at (step1.north west) {1};
+            \node[lbl] at (step2.north west) {2};
+            \node[lbl] at (step3.north west) {3};
+            \node[lbl] at (step4.north west) {4};
+            \node[lbl] at (step5.north west) {5};
+            \node[lbl] at (step6.north west) {6};
+            \node[lbl] at (step7.north west) {7};
 
       \end{tikzpicture}
-      \caption{Pipeline dell’esperimento: addestramento e selezione del Rashomon set, generazione delle spiegazioni, confronto di similarità e valutazione della fedeltà (MoRF/AOPC).}
-      \label{fig:pipeline}
+      \caption{Pipeline sperimentale ad alto livello: costruzione del \emph{Rashomon set}, generazione delle spiegazioni e valutazione di similarità e fedeltà.}
+      \label{fig:pipeline_simplified}
 \end{figure}
 
-\subsection{Tecnologie}
+\section{Tecnologie}
 Per implementare il workflow sperimentale descritto, è stato utilizzato un
 ecosistema di strumenti largamente adottati in ambito \emph{explainable AI}, in
 grado di garantire affidabilità, riproducibilità e scalabilità
@@ -239,6 +286,20 @@ $28\times28$ in blocchi $4\times4$ (\texttt{feature\_mask}), per un totale di
 \end{enumerate}
 Il numero di campioni $n\_samples$ è stato fissato a 200, per mitigare la variabilità intrinseca di LIME e migliorare la ripetibilità dei risultati.
 Poiché ogni spiegazione richiede $n\_samples$ forward pass, è stato utilizzato \texttt{perturbations\_per\_eval=50} per elaborare perturbazioni in batch, riducendo così l’overhead di chiamate ripetute al modello.
+
+\begin{figure}[htbp]
+      \centering
+      \setlength{\tabcolsep}{4pt}
+      \begin{tabular}{cc}
+            \includegraphics[width=0.45\textwidth]{images/lime_pixelwise.png} &
+            \includegraphics[width=0.45\textwidth]{images/lime_patch.png}                                                       \\
+            \small (a) LIME pixel-wise (784 feature)                          & \small (b) LIME a patch 4$\times$4 (49 feature)
+      \end{tabular}
+      \caption{Confronto qualitativo delle mappe LIME prima/dopo il passaggio al masking a patch.
+            L’approccio a patch riduce il rumore e mette a fuoco regioni più coerenti con la cifra.
+            Stesse immagini, stesso modello, $n_\mathrm{samples}=200$.}
+      \label{fig:lime_before_after}
+\end{figure}
 
 \paragraph{Integrated Gradients (IG).}
 È stato mantenuto il valore predefinito di \texttt{n\_steps} fornito da Captum.
@@ -311,7 +372,7 @@ riproducibilità dei risultati.
       \label{tab:hyperparams}
 \end{table}
 
-\section{Il Rashomon set}
+\chapter{Il Rashomon set}
 
 Il \emph{Rashomon set} è una collezione di modelli diversi che ottengono
 prestazioni simili su un determinato compito. Il termine deriva
@@ -322,7 +383,7 @@ che, anche a parità di accuratezza, modelli con parametri differenti possono
 fornire spiegazioni distinte per le proprie decisioni
 \citep{fisher2019all,semenova2019existence}.
 
-\subsection{Costruzione}
+\section{Costruzione}
 Il Rashomon set è stato costruito allenando più reti neurali della stessa
 architettura (una CNN semplice) sul dataset MNIST. Ogni rete parte da una
 diversa inizializzazione casuale dei pesi (\emph{random seed} differente) ed è
@@ -377,7 +438,8 @@ La costruzione del Rashomon set serve a due scopi principali:
       \item \textbf{Testare i metodi di spiegazione}: usando un insieme di modelli equivalenti, è possibile valutare la coerenza e la fedeltà delle spiegazioni prodotte da diversi algoritmi XAI \citep{leventi2023consistency}.
 \end{enumerate}
 
-\subsection{Approfondimento: equivalenza tra modelli}
+\section{Approfondimento}
+\subsection{Equivalenza tra modelli}
 Nel contesto di questo lavoro, due modelli sono considerati equivalenti se
 soddisfano la condizione di soglia sull’accuratezza definita sopra. Questa
 scelta è in linea con la definizione originaria di \emph{Rashomon set}
@@ -426,7 +488,7 @@ L’uso di Adam ha reso possibile mantenere tempi di addestramento contenuti pur
 una buona qualità della convergenza, aspetto particolarmente rilevante data
 l’esecuzione esclusivamente su CPU.
 
-\section{Metodi di spiegazione adottati}
+\chapter{Metodi di spiegazione adottati}
 
 Una volta selezionato il \emph{Rashomon set} dei modelli, il passo successivo
 consiste nell’analizzare come ciascun modello giunge alle proprie decisioni.
@@ -504,7 +566,7 @@ effettuare predizioni su input modificati
 (applicabili a qualsiasi modello), ma spesso più lenti e meno stabili, poiché
 si basano su approssimazioni locali.
 
-\section{Valutare la similarità tra spiegazioni}
+\chapter{Valutare la similarità tra spiegazioni}
 
 Quando osserviamo due spiegazioni, possiamo essere tentati di giudicare ``a
 occhio'' se siano simili o meno. Ma le apparenze ingannano: differenze visive
@@ -553,12 +615,16 @@ set e per ogni coppia di spiegazioni, considerando due scenari distinti
 \end{enumerate}
 
 Le attribuzioni sono calcolate sempre rispetto alla \textbf{classe vera}
-(\textit{true label}). Questa scelta è stata adottata per garantire coerenza
-con il \emph{ground truth} ed evitare che eventuali errori di classificazione
-alterino il confronto. Tuttavia, essa rappresenta una potenziale minaccia alla
-validità esterna: in scenari reali, la classe vera potrebbe non essere
-disponibile e il comportamento del metodo rispetto alla classe predetta
-potrebbe differire in modo significativo.
+(\textit{true label})\footnote{La \emph{true label} è l’etichetta corretta
+      associata a un singolo campione (es. la cifra “5” in un’immagine MNIST). Più in
+      generale, il termine \emph{ground truth} indica il riferimento di verità
+      utilizzato per valutare un modello, che nei problemi di classificazione
+      coincide con le true labels.}. Questa scelta è stata adottata per garantire
+coerenza con il \emph{ground truth} ed evitare che eventuali errori di
+classificazione alterino il confronto. Tuttavia, essa rappresenta una
+potenziale minaccia alla validità esterna: in scenari reali, la classe vera
+potrebbe non essere disponibile e il comportamento del metodo rispetto alla
+classe predetta potrebbe differire in modo significativo.
 
 \subsection{Risultati quantitativi}
 Le tabelle seguenti riassumono i valori medi delle metriche nei due scenari.
@@ -568,14 +634,14 @@ Le tabelle seguenti riassumono i valori medi delle metriche nei due scenari.
       \renewcommand{\arraystretch}{1.1}
       \begin{tabular}{lccccc c}
             \hline
-            \textbf{Coppia} & \textbf{SSIM} & \textbf{Pearson} & \textbf{Spearman} & \textbf{Cosine} & \textbf{MAE} & \textbf{n} \\
+            \textbf{Coppia} & \textbf{SSIM}     & \textbf{Pearson}  & \textbf{Spearman} & \textbf{Cosine}   & \textbf{MAE}      & \textbf{n} \\
             \hline
-            Saliency–IG     & 0.263         & 0.529            & 0.194             & 0.651           & 0.211        & 100        \\
-            Saliency–LIME   & 0.178         & 0.468            & 0.392             & 0.663           & 0.177        & 100        \\
-            IG–LIME         & 0.247         & 0.421            & 0.224             & 0.780           & 0.167        & 100        \\
+            Saliency–IG     & 0.263 $\pm$ 0.064 & 0.529 $\pm$ 0.082 & 0.194 $\pm$ 0.052 & 0.651 $\pm$ 0.045 & 0.211 $\pm$ 0.059 & 100        \\
+            Saliency–LIME   & 0.178 $\pm$ 0.043 & 0.468 $\pm$ 0.063 & 0.392 $\pm$ 0.089 & 0.663 $\pm$ 0.037 & 0.177 $\pm$ 0.045 & 100        \\
+            IG–LIME         & 0.247 $\pm$ 0.054 & 0.421 $\pm$ 0.059 & 0.224 $\pm$ 0.059 & 0.780 $\pm$ 0.056 & 0.167 $\pm$ 0.046 & 100        \\
             \hline
       \end{tabular}
-      \caption{Similarità \emph{intra-modello}: confronto tra metodi diversi sullo stesso modello (medie; dallo script non sono disponibili le deviazioni standard).}
+      \caption{Similarità \emph{intra-modello}: confronto tra metodi diversi sullo stesso modello (\textbf{media $\pm$ deviazione standard}).}
       \label{tab:sim_intra}
 \end{table}
 
@@ -584,14 +650,14 @@ Le tabelle seguenti riassumono i valori medi delle metriche nei due scenari.
       \renewcommand{\arraystretch}{1.1}
       \begin{tabular}{lccccc c}
             \hline
-            \textbf{Metodo} & \textbf{SSIM} & \textbf{Pearson} & \textbf{Spearman} & \textbf{Cosine} & \textbf{MAE} & \textbf{n} \\
+            \textbf{Metodo} & \textbf{SSIM}     & \textbf{Pearson}  & \textbf{Spearman} & \textbf{Cosine}   & \textbf{MAE}      & \textbf{n} \\
             \hline
-            Saliency        & 0.439         & 0.612            & 0.688             & 0.727           & 0.069        & 450        \\
-            IG              & 0.711         & 0.723            & 0.516             & 0.970           & 0.083        & 450        \\
-            LIME            & 0.639         & 0.864            & 0.541             & 0.929           & 0.093        & 450        \\
+            Saliency        & 0.439 $\pm$ 0.067 & 0.612 $\pm$ 0.064 & 0.688 $\pm$ 0.062 & 0.727 $\pm$ 0.042 & 0.069 $\pm$ 0.012 & 450        \\
+            IG              & 0.711 $\pm$ 0.077 & 0.723 $\pm$ 0.079 & 0.516 $\pm$ 0.085 & 0.970 $\pm$ 0.013 & 0.083 $\pm$ 0.049 & 450        \\
+            LIME            & 0.639 $\pm$ 0.086 & 0.864 $\pm$ 0.051 & 0.541 $\pm$ 0.116 & 0.929 $\pm$ 0.028 & 0.093 $\pm$ 0.025 & 450        \\
             \hline
       \end{tabular}
-      \caption{Similarità \emph{inter-modello}: stesso metodo applicato a modelli diversi del Rashomon set (medie; dallo script non sono disponibili le deviazioni standard).}
+      \caption{Similarità \emph{inter-modello}: stesso metodo applicato a modelli diversi del Rashomon set (\textbf{media $\pm$ deviazione standard}).}
       \label{tab:sim_inter}
 \end{table}
 
@@ -606,35 +672,46 @@ Le tabelle seguenti riassumono i valori medi delle metriche nei due scenari.
 \end{figure}
 
 \subsection{Interpretazione}
-I valori mostrano una tendenza chiara:
+I risultati mostrano una tendenza chiara e robusta:
 \begin{itemize}
-      \item La similarità \textbf{inter-modello} è più alta per tutte le metriche rispetto
-            all'intra-modello, indicando che un singolo metodo tende a produrre spiegazioni
-            coerenti tra modelli diversi del Rashomon set.
-      \item La similarità \textbf{intra-modello} è sensibilmente più bassa: metodi diversi,
-            anche sullo stesso modello, producono spiegazioni tra loro divergenti.
+      \item La similarità \textbf{inter-modello} è sistematicamente più alta della
+            \textbf{intra-modello} per tutte le metriche considerate. Questo indica che un
+            singolo metodo tende a produrre spiegazioni coerenti anche al variare del
+            modello del Rashomon set (es., SSIM: IG $0.711 \pm 0.077$, LIME $0.639 \pm
+                  0.086$, Saliency $0.439 \pm 0.067$, $n=450$).
+      \item La similarità \textbf{intra-modello} (metodi diversi sullo stesso modello) è
+            sensibilmente più bassa, confermando che la scelta del metodo di spiegazione
+            introduce le maggiori divergenze (es., SSIM: Saliency--IG $0.263 \pm 0.064$,
+            Saliency--LIME $0.178 \pm 0.043$, IG--LIME $0.247 \pm 0.054$, $n=100$).
 \end{itemize}
 
-Guardando ai risultati, emerge una tendenza coerente con quanto riportato in
-letteratura: la similarità \textbf{inter-modello} è sistematicamente più alta
-della \textbf{intra-modello}, indipendentemente dalla metrica utilizzata. Ad
-esempio, LIME raggiunge valori di Pearson pari a $0.864$ tra modelli diversi,
-mentre la stessa metrica scende a $0.421$–$0.529$ quando si confronta LIME con
-altri metodi sullo stesso modello.
+Guardando nel dettaglio, emerge un quadro coerente con la letteratura. In
+\textbf{inter-modello}, \emph{Integrated Gradients (IG)} risulta il più stabile
+in termini di direzione del vettore di attribuzioni (Cosine $0.970 \pm 0.013$),
+mentre \emph{LIME} mostra la correlazione lineare media più alta (Pearson
+$0.864 \pm 0.051$). \emph{Saliency} mantiene un buon ordinamento relativo delle
+importanze al variare del modello (Spearman $0.688 \pm 0.062$). Le deviazioni
+standard relativamente contenute in questo scenario confermano la coerenza tra
+modelli dello stesso metodo.
 
-La situazione si inverte quando cambiamo il metodo: qui le similarità calano
-drasticamente, con SSIM compresi tra $0.178$ e $0.263$ e correlazioni Spearman
-che, in certi confronti, non superano $0.392$. Questi numeri confermano che la
-\emph{scelta del metodo di spiegazione} è il fattore che più influenza forma,
-intensità e posizionamento delle regioni considerate rilevanti.
+In \textbf{intra-modello}, le similarità calano marcatamente: ad esempio,
+\emph{SSIM} scende a $0.178$--$0.263$ con dispersioni non trascurabili ($\pm
+      0.043$--$\pm 0.064$), e le correlazioni di rango (\emph{Spearman}) raramente
+superano $0.392$ (Saliency--LIME $0.392 \pm 0.089$). Ciò suggerisce che metodi
+diversi “raccontano storie diverse” anche quando osservano lo stesso modello:
+differiscono nella \emph{forma} (SSIM), nell’\emph{ordinamento} (Spearman) e,
+in parte, nell'\emph'{intensità/direzione} (MAE/Cosine) delle regioni ritenute
+rilevanti.
 
-In altre parole, i metodi “raccontano storie diverse” anche quando osservano lo
-stesso modello. Questo suggerisce che, nel contesto analizzato, la \emph{scelta
-      del metodo di spiegazione} ha un impatto più marcato sulla forma e sul
-contenuto della spiegazione rispetto alla scelta del modello, almeno
-all’interno del Rashomon set considerato.
+In sintesi, nel contesto analizzato, la \textbf{scelta del metodo di
+      spiegazione} ha un impatto più marcato sulla forma e sul contenuto della
+spiegazione rispetto alla \textbf{scelta del modello}. Le deviazioni standard
+riportate rendono esplicita questa variabilità: molto contenuta \emph{tra
+      modelli} per uno stesso metodo (es., Cosine di IG $0.970 \pm 0.013$), più ampia
+\emph{tra metodi} sullo stesso modello (es., Spearman $0.194 \pm 0.052$ fino a
+$0.392 \pm 0.089$).
 
-\section{Valutare la fedeltà delle spiegazioni: MoRF e AOPC}
+\chapter{Valutare la fedeltà delle spiegazioni: MoRF e AOPC}
 
 Misurare la similarità tra spiegazioni è utile per capire se due metodi
 ``raccontano la stessa storia''. Ma una spiegazione può anche essere coerente e
@@ -642,7 +719,7 @@ stabile, eppure irrilevante per il modello. Per questo serve valutare la
 \emph{fedeltà}: le feature indicate come rilevanti sono davvero quelle che
 guidano la decisione del modello?
 
-\subsection{Procedura MoRF}
+\section{Procedura MoRF}
 Il metodo \emph{Most Relevant First} (MoRF) è un approccio standard in
 letteratura per testare la fedeltà delle mappe di importanza
 \citep{samek2016evaluating,samek2017explainable}. L’idea è semplice: se le
@@ -664,7 +741,7 @@ Il procedimento seguito è stato il seguente:
             della porzione di immagine mascherata.
 \end{enumerate}
 
-\subsection{AOPC: Area Over the Perturbation Curve}
+\section{AOPC: Area Over the Perturbation Curve}
 Per riassumere in un solo numero la qualità di una spiegazione, è stata
 utilizzata la metrica \textbf{AOPC} (\emph{Area Over the Perturbation Curve}),
 introdotta da \citet{samek2016evaluating}, calcolata come:
@@ -720,10 +797,10 @@ function calcola_aopc(modello, immagine, mappa_spiegazione, steps=10):
 \end{table}
 
 \begin{figure}[h!]
-    \centering
-    \includegraphics[width=0.75\textwidth]{images/grafMorf.png}
-    \caption{Curve MoRF medie: andamento della probabilità della classe corretta al crescere della percentuale di feature rimosse.}
-    \label{fig:morf_curves}
+      \centering
+      \includegraphics[width=0.75\textwidth]{images/grafMorf.png}
+      \caption{Curve MoRF medie: andamento della probabilità della classe corretta al crescere della percentuale di feature rimosse.}
+      \label{fig:morf_curves}
 \end{figure}
 
 \noindent
@@ -741,7 +818,7 @@ Saliency, infine, mostra valori più bassi, segnalando che alcune feature eviden
 
 È importante notare che un AOPC elevato non implica necessariamente maggiore interpretabilità per l’utente umano: misura soltanto la capacità della spiegazione di individuare feature la cui rimozione comporta un rapido calo di confidenza del modello. Inoltre, i valori sono influenzati da scelte implementative come la baseline di mascheramento (media immagine) e, nel caso di LIME, dalla granularità delle perturbazioni (blocchi $4\times4$) e dal numero di campioni utilizzati.
 
-\section{Discussione e implicazioni}
+\chapter{Discussione e implicazioni}
 
 L’analisi ha mostrato che, nel contesto di un \emph{Rashomon set}, le
 differenze tra metodi di spiegazione possono risultare più marcate di quelle
@@ -749,6 +826,36 @@ tra modelli ugualmente accurati. Questo rafforza l’idea che la scelta del
 metodo XAI sia cruciale almeno quanto quella dell’architettura del modello,
 quando l’obiettivo è comprendere le decisioni di un sistema di apprendimento
 automatico.
+
+\section{Trade-off tra fedeltà (AOPC) e stabilità (similarità)}
+\label{sec:disc-tradeoff}
+
+Mettendo in relazione i risultati di \emph{fedeltà} (AOPC; Tab.~\ref{tab:aopc_results})
+con quelli di \emph{stabilità} tra modelli (similarità inter-modello;
+Tab.~\ref{tab:sim_inter}), emerge un chiaro compromesso.
+
+\paragraph{Evidenze quantitative.}
+\textbf{LIME} massimizza in media la fedeltà (\emph{AOPC} $0.7993 \pm 0.0948$), indicando che le
+regioni identificate come rilevanti causano un rapido decadimento della confidenza quando rimosse.
+\textbf{Integrated Gradients (IG)} mostra invece una \textbf{stabilità inter-modello} molto elevata
+(es. Cosine $0.970 \pm 0.013$, SSIM $0.711 \pm 0.077$), producendo mappe più coerenti al variare
+dell’architettura. \textbf{Saliency} risulta intermedio/meno performante a seconda della metrica
+(es. Spearman inter-modello $0.688 \pm 0.062$), suggerendo un buon mantenimento del \emph{ranking}
+pur con minore fedeltà rispetto a LIME.
+
+\paragraph{Quando privilegiare cosa.}
+In contesti di \emph{debug/diagnosi}, dove è cruciale scoprire feature realmente decisive,
+può essere preferibile \textbf{LIME} (maggiore AOPC), accettando una variabilità superiore.
+In scenari di \emph{comunicazione verso utenti finali} o documentazione, dove la consistenza
+tra modelli è prioritaria, risulta più adatto \textbf{Integrated Gradients} (maggiore stabilità).
+\textbf{Saliency} può essere utile quando interessa soprattutto preservare l’\emph{ordinamento relativo}
+delle importanze (correlazioni di rango), più che la struttura spaziale o la magnitudine assoluta.
+
+\paragraph{Limiti di interpretazione.}
+Un AOPC elevato non implica automaticamente una migliore interpretabilità per l’utente umano:
+misura l’impatto della rimozione di regioni ritenute importanti, non la \emph{chiarezza}
+della spiegazione. Inoltre, le grandezze osservate dipendono da scelte implementative come
+la baseline di mascheramento per MoRF e la granularità/numero di campioni in LIME.
 
 \subsection{Sintesi dei risultati principali}
 \begin{itemize}
@@ -788,7 +895,7 @@ CIFAR-10, ImageNet), il confronto tra architetture differenti, l’inclusione di
 metodi più recenti (Grad-CAM, SHAP) e l’uso di metriche \emph{user-centered}
 per valutare anche l’efficacia comunicativa delle spiegazioni.
 
-\section*{Conclusioni}
+\chapter*{Conclusioni}
 
 Questo studio ha proposto un approccio sperimentale basato sul \emph{Rashomon
       set} per valutare la robustezza e la fedeltà delle spiegazioni fornite da
@@ -814,7 +921,8 @@ deve essere verificata sperimentalmente. L’approccio basato sul \emph{Rashomon
 aspetti, ponendo le basi per futuri studi su dataset più complessi,
 architetture eterogenee e metodi di spiegazione avanzati.
 
-\bibliographystyle{plainnat}
+\clearpage
+\bibliographystyle{plainnat} % coerente con natbib numeric compressed
 \bibliography{references_base}
 
 \end{document}
