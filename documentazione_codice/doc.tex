@@ -83,6 +83,32 @@
   arrow/.style={-{Stealth[length=2.4mm]}, thick}
 }
 
+\usepackage[section]{placeins}    
+\usepackage{needspace}             
+\usepackage{changepage}            
+
+\setcounter{topnumber}{2}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{4}
+\renewcommand{\topfraction}{.85}
+\renewcommand{\bottomfraction}{.7}
+\renewcommand{\textfraction}{.10}
+\renewcommand{\floatpagefraction}{.80}
+
+\setlength{\textfloatsep}{10pt plus 2pt minus 2pt}
+\setlength{\floatsep}{8pt plus 2pt minus 2pt}
+
+\captionsetup[table]{aboveskip=6pt, belowskip=4pt}
+\captionsetup[figure]{aboveskip=6pt, belowskip=4pt}
+
+\newenvironment{tabindent}[1][\parindent]{%
+  \begin{table}[H]\begin{adjustwidth}{#1}{0pt}\centering}{%
+  \end{adjustwidth}\end{table}}
+
+\newenvironment{figindent}[1][\parindent]{%
+  \begin{figure}[H]\begin{adjustwidth}{#1}{0pt}\centering}{%
+  \end{adjustwidth}\end{figure}}
+
 % --- (Opzionale) Glossario/acronimi ---
 % \usepackage[acronym,toc]{glossaries}
 % \makeglossaries
@@ -98,8 +124,33 @@
 \begin{document}
 
 \maketitle
-\tableofcontents
+
+\begin{abstract}
+      \noindent
+      \textbf{Background:} Nel machine learning, l'effetto Rashomon descrive l'esistenza di molteplici modelli con prestazioni predictive equivalenti ma parametri diversi. Questo solleva una questione fondamentale per l'XAI: questi modelli forniscono spiegazioni simili per le stesse previsioni?
+
+      \vspace{0.5em}
+
+      \noindent
+      \textbf{Metodi:} È stato costruito un Rashomon set di 10 reti neurali convolutional (CNN) con accuratezza entro l'1\% sul dataset MNIST. Per un campione di 100 immagini di test, sono state generate spiegazioni locali utilizzando tre metodi: Saliency, Integrated Gradients (IG) e LIME. Sono state quindi valutate la similarità tra le spiegazioni (tramite SSIM, correlazione di Pearson e Spearman, similarità del coseno e MAE) e la loro fedeltà (utilizzando le curve MoRF e la metrica AOPC).
+
+      \vspace{0.5em}
+
+      \noindent
+      \textbf{Risultati:} La variabilità nelle spiegazioni è risultata essere principalmente guidata dalla scelta del metodo di XAI, non dal modello specifico all'interno del Rashomon set. La similarità inter-modello (stesso metodo, modelli diversi) è sistematicamente più alta della similarità intra-modello (metodi diversi, stesso modello). In termini di fedeltà, LIME ha ottenuto il punteggio AOPC più alto (0.7993), indicando che le feature che identifica sono le più decisive per la previsione del modello. Integrated Gradients ha mostrato un buon compromesso tra fedeltà (AOPC = 0.7511) e coerenza.
+
+      \vspace{0.5em}
+
+      \noindent
+      \textbf{Conclusioni:} I risultati dimostrano che, in questo contesto, la scelta dell'algoritmo di spiegazione ha un impatto maggiore sulla spiegazione risultante rispetto alla variazione dei parametri del modello. Importante sottolineare l'importanza di valutare sia la similarità che la fedeltà per validare i metodi XAI, specialmente in scenari dove coesistono modelli equivamente accurati.
+\end{abstract}
 \newpage
+
+\tableofcontents
+
+\newpage
+
+\maketitle
 
 \chapter{Introduzione}
 
@@ -251,7 +302,7 @@ grado di garantire affidabilità, riproducibilità e scalabilità
       \item \textbf{Glob, os}: per la gestione di file, directory e per il caricamento/salvataggio dei modelli, a supporto della riproducibilità.
 \end{itemize}
 
-\subsection{Riproducibilità e ambiente di sviluppo}
+\section{Riproducibilità e ambiente di sviluppo}
 Per garantire la riproducibilità degli esperimenti e la gestione efficiente
 delle dipendenze, sono state adottate le seguenti buone pratiche, in linea con
 le raccomandazioni di \citet{pineau2020improving}:
@@ -262,7 +313,7 @@ le raccomandazioni di \citet{pineau2020improving}:
       \item \textbf{Salvataggio e caricamento dei modelli}: i modelli selezionati per il Rashomon set sono stati salvati su disco durante la fase di addestramento, evitando la ripetizione di processi costosi e permettendo il loro riutilizzo in fasi successive.
 \end{itemize}
 
-\subsection{Scelte implementative}
+\section{Scelte implementative}
 \label{sec:scelte_implementative}
 
 Gli esperimenti sono stati condotti interamente su \textbf{CPU}, scelta che ha
@@ -338,7 +389,7 @@ confronto tra spiegazioni. Tuttavia, si riconosce che questa impostazione non
 riflette scenari reali, dove la classe vera potrebbe non essere disponibile —
 rappresentando quindi una possibile minaccia alla validità esterna.
 
-\subsection{Hyperparametri e setup sperimentale}
+\section{Hyperparametri e setup sperimentale}
 
 Nella Tabella~\ref{tab:hyperparams} sono riportati tutti i parametri e le
 impostazioni utilizzate negli esperimenti, in modo da permettere la
@@ -397,7 +448,7 @@ epoche consecutive. In questo modo si seleziona automaticamente la versione del
 modello che ha ottenuto la miglior accuratezza sul validation, riducendo il
 rischio di overfitting e garantendo un confronto equo tra i membri del set.
 
-\subsection{Selezione}
+\section{Selezione}
 Al termine dell’addestramento, sono stati selezionati tutti i modelli che
 ottenevano un’accuratezza sul validation entro una certa soglia rispetto al
 modello con la miglior performance. In questo esperimento la soglia è pari
@@ -431,7 +482,7 @@ for i in 1 to NUM_MODELS:
         salva_modello(modello)
 \end{lstlisting}
 
-\subsection{Obiettivi}
+\section{Obiettivi}
 La costruzione del Rashomon set serve a due scopi principali:
 \begin{enumerate}
       \item \textbf{Studiare la variabilità delle spiegazioni}: se modelli ugualmente accurati forniscono spiegazioni simili, allora queste possono essere considerate robuste; se divergono, si manifesta l’effetto Rashomon anche nell’interpretabilità \citep{mueller2023rashomon}.
@@ -439,7 +490,7 @@ La costruzione del Rashomon set serve a due scopi principali:
 \end{enumerate}
 
 \section{Approfondimento}
-\subsection{Equivalenza tra modelli}
+\section{Equivalenza tra modelli}
 Nel contesto di questo lavoro, due modelli sono considerati equivalenti se
 soddisfano la condizione di soglia sull’accuratezza definita sopra. Questa
 scelta è in linea con la definizione originaria di \emph{Rashomon set}
@@ -455,7 +506,7 @@ criterio permette di:
             nelle spiegazioni \citep{leventi2023consistency}.
 \end{itemize}
 
-\subsection{Perché utilizzare l’early stopping}
+\section{Perché utilizzare l’early stopping}
 L’\emph{early stopping} \citep{prechelt1998early} è stato adottato per due
 motivi principali:
 \begin{itemize}
@@ -471,7 +522,7 @@ casuali di librerie esterne) \citep{reimers2017reporting}, è possibile
 distinguere la variabilità dovuta al caso da quella legata a differenze
 strutturali nei modelli o nelle spiegazioni.
 
-\subsection{Scelta dell’ottimizzatore: Adam.}
+\section{Scelta dell’ottimizzatore: Adam.}
 Per l’addestramento di tutte le reti neurali è stato utilizzato l’ottimizzatore
 \emph{Adam} (\emph{Adaptive Moment Estimation}) \citep{kingma2014adam},
 ampiamente adottato in ambito \emph{deep learning} per la sua capacità di
@@ -496,7 +547,7 @@ Per questo scopo sono stati utilizzati tre metodi di spiegazione, scelti per
 rappresentare sia approcci \emph{gradient-based} che \emph{model-agnostic}
 \cite{adadi2018survey,guidotti2018survey}.
 
-\subsection{Saliency}
+\section{Saliency}
 Il metodo della \emph{saliency map} \cite{simonyan2013deep,samek2016evaluating}
 è uno dei più semplici e diffusi. Calcola la derivata della probabilità (o
 della logit) assegnata dal modello alla classe target rispetto a ciascun pixel
@@ -505,7 +556,7 @@ considerati più importanti per la decisione. Questo metodo è apprezzato per la
 sua immediatezza, ma è noto per essere sensibile al rumore e
 all’inizializzazione dei pesi del modello.
 
-\subsection{Integrated Gradients (IG)}
+\section{Integrated Gradients (IG)}
 Gli \emph{Integrated Gradients} \cite{sundararajan2017axiomatic} migliorano
 l’approccio delle saliency map, correggendone alcune limitazioni. Calcolano il
 contributo di ogni feature effettuando una media dei gradienti lungo un
@@ -514,7 +565,7 @@ all’immagine reale. Questo consente di ottenere spiegazioni più stabili e
 coerenti, meno influenzate da piccole variazioni nei dati o nei parametri del
 modello.
 
-\subsection{LIME}
+\section{LIME}
 Il metodo \emph{LIME} (\emph{Local Interpretable Model-agnostic Explanations})
 \cite{ribeiro2016lime} genera nuove istanze di input perturbate (ad esempio,
 oscurando casualmente parti dell’immagine) e osserva come cambia la predizione
@@ -540,7 +591,7 @@ function genera_spiegazioni(modello, immagine, etichetta_vera):
     return spiegazioni
 \end{lstlisting}
 
-\subsection{Motivazioni della scelta}
+\section{Motivazioni della scelta}
 La combinazione di questi tre metodi consente di confrontare:
 \begin{itemize}
       \item Approcci \emph{gradient-based} (Saliency, IG) e approcci \emph{model-agnostic}
@@ -550,7 +601,7 @@ La combinazione di questi tre metodi consente di confrontare:
             dell’importanza delle feature \citep{samek2016evaluating,guidotti2018survey}.
 \end{itemize}
 
-\subsection{Gradient-based vs Model-agnostic}
+\section{Gradient-based vs Model-agnostic}
 I metodi di spiegazione \emph{gradient-based} sfruttano direttamente la
 struttura interna del modello: calcolano come varia la predizione rispetto a
 piccole modifiche delle feature in input, utilizzando le derivate calcolate
@@ -578,7 +629,7 @@ spiegazioni è un passo fondamentale per capire la robustezza e la stabilità
 delle interpretazioni fornite dai metodi di \emph{eXplainable AI} (XAI)
 \citep{samek2016evaluating, mueller2023rashomon}.
 
-\subsection{Metriche adottate}
+\section{Metriche adottate}
 Per trasformare un concetto qualitativo come ``somiglianza visiva'' in numeri,
 è necessario scegliere metriche che catturino aspetti diversi della relazione
 tra due mappe di importanza:
@@ -596,7 +647,7 @@ similarità: dalla struttura globale all’ordine delle feature, fino alla
 corrispondenza numerica esatta \citep{leventi2023consistency,
       samek2016evaluating}.
 
-\subsection{Procedura di confronto}
+\section{Procedura di confronto}
 Il confronto è stato condotto calcolando le metriche per ogni immagine del test
 set e per ogni coppia di spiegazioni, considerando due scenari distinti
 \citep{bhatt2021evaluating, mueller2023rashomon, leventi2023consistency,
@@ -626,11 +677,13 @@ potenziale minaccia alla validità esterna: in scenari reali, la classe vera
 potrebbe non essere disponibile e il comportamento del metodo rispetto alla
 classe predetta potrebbe differire in modo significativo.
 
-\subsection{Risultati quantitativi}
+\section{Risultati quantitativi}
 Le tabelle seguenti riassumono i valori medi delle metriche nei due scenari.
 
-\begin{table}[h!]
-      \centering
+\FloatBarrier
+\Needspace{18\baselineskip}
+
+\begin{tabindent}
       \renewcommand{\arraystretch}{1.1}
       \begin{tabular}{lccccc c}
             \hline
@@ -641,12 +694,13 @@ Le tabelle seguenti riassumono i valori medi delle metriche nei due scenari.
             IG–LIME         & 0.247 $\pm$ 0.054 & 0.421 $\pm$ 0.059 & 0.224 $\pm$ 0.059 & 0.780 $\pm$ 0.056 & 0.167 $\pm$ 0.046 & 100        \\
             \hline
       \end{tabular}
-      \caption{Similarità \emph{intra-modello}: confronto tra metodi diversi sullo stesso modello (\textbf{media $\pm$ deviazione standard}).}
+      \caption{Similarità \emph{intra-modello}: confronto tra metodi sullo stesso modello (media $\pm$ dev. std).}
       \label{tab:sim_intra}
-\end{table}
+\end{tabindent}
 
-\begin{table}[h!]
-      \centering
+\vspace{-0.3\baselineskip}
+
+\begin{tabindent}
       \renewcommand{\arraystretch}{1.1}
       \begin{tabular}{lccccc c}
             \hline
@@ -657,11 +711,15 @@ Le tabelle seguenti riassumono i valori medi delle metriche nei due scenari.
             LIME            & 0.639 $\pm$ 0.086 & 0.864 $\pm$ 0.051 & 0.541 $\pm$ 0.116 & 0.929 $\pm$ 0.028 & 0.093 $\pm$ 0.025 & 450        \\
             \hline
       \end{tabular}
-      \caption{Similarità \emph{inter-modello}: stesso metodo applicato a modelli diversi del Rashomon set (\textbf{media $\pm$ deviazione standard}).}
+      \caption{Similarità \emph{inter-modello}: stesso metodo su modelli diversi (media $\pm$ dev. std).}
       \label{tab:sim_inter}
-\end{table}
+\end{tabindent}
 
-\begin{figure}[h!]
+{\small \textit{Rimandiamo alla Sez.~\ref{sec:disc-tradeoff} per il trade-off tra stabilità e fedeltà.}}
+
+\Needspace{8\baselineskip}
+
+\begin{figindent}
       \centering
       \includegraphics[width=\textwidth]{images/visualizzazione (2).png}
       \caption{Esempi di mappe di attribuzione per 10 modelli del Rashomon set su alcune immagini di test (MNIST).
@@ -669,7 +727,7 @@ Le tabelle seguenti riassumono i valori medi delle metriche nei due scenari.
             Si osserva come le spiegazioni siano generalmente più coerenti \textbf{tra modelli} usando lo stesso metodo (colonne verticali),
             mentre differenze più marcate emergono \textbf{tra metodi} sullo stesso modello (blocchi orizzontali).}
       \label{fig:similarity_examples}
-\end{figure}
+\end{figindent}
 
 \subsection{Interpretazione}
 I risultati mostrano una tendenza chiara e robusta:
@@ -779,7 +837,7 @@ function calcola_aopc(modello, immagine, mappa_spiegazione, steps=10):
     return aopc, probas
 \end{lstlisting}
 
-\subsection{Risultati AOPC}
+\section{Risultati AOPC}
 \begin{table}[h!]
       \centering
       \renewcommand{\arraystretch}{1.1}
@@ -810,6 +868,8 @@ I risultati mostrano che:
       \item \textbf{Integrated Gradients} ottiene un valore intermedio, combinando buona fedeltà con alta coerenza inter-modello.
       \item \textbf{Saliency} registra valori più bassi, indicando che le feature evidenziate non sempre sono decisive per la classificazione.
 \end{itemize}
+{\small\textit{La relazione tra questi risultati e la stabilità inter-modello è discussa in
+      Sez.~\ref{sec:disc-tradeoff}.}}
 
 \noindent
 Tali risultati vanno interpretati con cautela. LIME, pur essendo più rumoroso nelle visualizzazioni e meno coerente tra modelli, ottiene il punteggio AOPC più alto. Questo suggerisce che, quando individua una feature come rilevante, essa ha un impatto marcato sulla decisione del modello. \\
@@ -830,9 +890,10 @@ automatico.
 \section{Trade-off tra fedeltà (AOPC) e stabilità (similarità)}
 \label{sec:disc-tradeoff}
 
-Mettendo in relazione i risultati di \emph{fedeltà} (AOPC; Tab.~\ref{tab:aopc_results})
-con quelli di \emph{stabilità} tra modelli (similarità inter-modello;
-Tab.~\ref{tab:sim_inter}), emerge un chiaro compromesso.
+Mettendo in relazione i risultati di \emph{fedeltà} (AOPC;
+Tab.~\ref{tab:aopc_results}) con quelli di \emph{stabilità} tra modelli
+(similarità inter-modello; Tab.~\ref{tab:sim_inter}), emerge un chiaro
+compromesso.
 
 \paragraph{Evidenze quantitative.}
 \textbf{LIME} massimizza in media la fedeltà (\emph{AOPC} $0.7993 \pm 0.0948$), indicando che le
@@ -844,20 +905,23 @@ dell’architettura. \textbf{Saliency} risulta intermedio/meno performante a sec
 pur con minore fedeltà rispetto a LIME.
 
 \paragraph{Quando privilegiare cosa.}
-In contesti di \emph{debug/diagnosi}, dove è cruciale scoprire feature realmente decisive,
-può essere preferibile \textbf{LIME} (maggiore AOPC), accettando una variabilità superiore.
-In scenari di \emph{comunicazione verso utenti finali} o documentazione, dove la consistenza
-tra modelli è prioritaria, risulta più adatto \textbf{Integrated Gradients} (maggiore stabilità).
-\textbf{Saliency} può essere utile quando interessa soprattutto preservare l’\emph{ordinamento relativo}
-delle importanze (correlazioni di rango), più che la struttura spaziale o la magnitudine assoluta.
+In contesti di \emph{debug/diagnosi}, dove è cruciale scoprire feature
+realmente decisive, può essere preferibile \textbf{LIME} (maggiore AOPC),
+accettando una variabilità superiore. In scenari di \emph{comunicazione verso
+      utenti finali} o documentazione, dove la consistenza tra modelli è prioritaria,
+risulta più adatto \textbf{Integrated Gradients} (maggiore stabilità).
+\textbf{Saliency} può essere utile quando interessa soprattutto preservare
+l’\emph{ordinamento relativo} delle importanze (correlazioni di rango), più che
+la struttura spaziale o la magnitudine assoluta.
 
 \paragraph{Limiti di interpretazione.}
-Un AOPC elevato non implica automaticamente una migliore interpretabilità per l’utente umano:
-misura l’impatto della rimozione di regioni ritenute importanti, non la \emph{chiarezza}
-della spiegazione. Inoltre, le grandezze osservate dipendono da scelte implementative come
-la baseline di mascheramento per MoRF e la granularità/numero di campioni in LIME.
+Un AOPC elevato non implica automaticamente una migliore interpretabilità per
+l’utente umano: misura l’impatto della rimozione di regioni ritenute
+importanti, non la \emph{chiarezza} della spiegazione. Inoltre, le grandezze
+osservate dipendono da scelte implementative come la baseline di mascheramento
+per MoRF e la granularità/numero di campioni in LIME.
 
-\subsection{Sintesi dei risultati principali}
+\section{Sintesi dei risultati principali}
 \begin{itemize}
       \item La \textbf{variabilità intra-modello} è risultata più elevata della variabilità
             inter-modello, segnalando che metodi diversi possono produrre interpretazioni
@@ -867,7 +931,7 @@ la baseline di mascheramento per MoRF e la granularità/numero di campioni in LI
       \item \textbf{Saliency} ha avuto prestazioni più basse in entrambe le metriche, suggerendo affidabilità limitata nel contesto MNIST e con configurazione base.
 \end{itemize}
 
-\subsection{Implicazioni pratiche}
+\section{Implicazioni pratiche}
 I risultati suggeriscono che:
 \begin{enumerate}
       \item La scelta del metodo XAI deve considerare sia la stabilità rispetto a
@@ -880,7 +944,7 @@ I risultati suggeriscono che:
             equivalenti possono coesistere.
 \end{enumerate}
 
-\subsection{Limiti e sviluppi futuri}
+\section{Limiti e sviluppi futuri}
 Le principali limitazioni riguardano:
 \begin{itemize}
       \item l’uso di un dataset semplice (MNIST), che non riflette la complessità di domini
