@@ -16,6 +16,7 @@ from scipy.stats import pearsonr, spearmanr
 from itertools import combinations
 
 import matplotlib.pyplot as plt
+from statistics import mean, pstdev
 
 # PARAMETRI
 SEED = 42
@@ -54,6 +55,19 @@ def create_feature_mask(patch=4):
     col_ids = torch.arange(w_blocks).repeat_interleave(patch)
     feature_ids = (row_ids.unsqueeze(1) * w_blocks + col_ids).to(dtype=torch.long)
     return feature_ids.unsqueeze(0).unsqueeze(0)  # [1,1,28,28]
+
+# Funzione di valutazione
+def evaluate_accuracy(model, loader, device='cpu'):
+    model.eval()
+    correct = total = 0
+    with torch.no_grad():
+        for x, y in loader:
+            x = x.to(device)
+            logits = model(x)
+            pred = logits.argmax(1).cpu()
+            correct += (pred == y).sum().item()
+            total   += y.size(0)
+    return correct / total if total else float('nan')
 
 FEATURE_MASK = create_feature_mask(patch=4)  # patch=4 => 49 feature
 
@@ -165,6 +179,40 @@ else:
     print(f"\nMigliore accuracy: {best_acc:.4f}")
     print(f"Soglia Rashomon: {rashomon_threshold:.4f}")
     print(f"Modelli Rashomon selezionati: {len(rashomon_models)}/{NUM_MODELS}")
+    
+# VALUTAZIONE RASHOMON SET
+print("\n" + "="*50)
+print("Rashomon set: validazione della 'equivalenza' (accuracies)")
+print("="*50)
+
+rashomon_metrics = []
+for i, m in enumerate(rashomon_models):
+    val_acc  = evaluate_accuracy(m, val_loader, device='cpu')
+    test_acc = evaluate_accuracy(m, test_loader, device='cpu')
+    rashomon_metrics.append({
+        "model_id": i,
+        "val_acc": val_acc,
+        "test_acc": test_acc
+    })
+
+# Stampa tabella ordinata per val_acc decrescente
+rashomon_metrics.sort(key=lambda r: r["val_acc"], reverse=True)
+print(f"{'Model':>5}  {'ValAcc':>8}  {'TestAcc':>8}")
+for r in rashomon_metrics:
+    print(f"{r['model_id']:>5}  {r['val_acc']*100:8.2f}%  {r['test_acc']*100:8.2f}%")
+
+# Riassunto (media ± std, min/max)
+val_list  = [r["val_acc"] for r in rashomon_metrics]
+test_list = [r["test_acc"] for r in rashomon_metrics]
+
+def pct(x): return f"{x*100:.2f}%"
+def pm(m,s): return f"{m*100:.2f}% ± {s*100:.2f}%"
+
+print("\nRiepilogo:")
+print(f"- Val acc (media±std):  {pm(mean(val_list),  pstdev(val_list) if len(val_list)>1 else 0.0)}")
+print(f"- Test acc (media±std): {pm(mean(test_list), pstdev(test_list) if len(test_list)>1 else 0.0)}")
+print(f"- Val acc min..max:     {pct(min(val_list))} .. {pct(max(val_list))}")
+print(f"- Test acc min..max:    {pct(min(test_list))} .. {pct(max(test_list))}")
 
 # GENERAZIONE SPIEGAZIONI
 print("\n" + "="*50)

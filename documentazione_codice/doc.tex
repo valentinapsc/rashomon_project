@@ -87,6 +87,8 @@
 \usepackage{needspace}             
 \usepackage{changepage}            
 
+\usepackage{adjustbox}
+
 \setcounter{topnumber}{2}
 \setcounter{bottomnumber}{2}
 \setcounter{totalnumber}{4}
@@ -127,12 +129,12 @@
 
 \begin{abstract}
       \noindent
-      \textbf{Background:} Nel machine learning, l'effetto Rashomon descrive l'esistenza di molteplici modelli con prestazioni predictive equivalenti ma parametri diversi. Questo solleva una questione fondamentale per l'XAI: questi modelli forniscono spiegazioni simili per le stesse previsioni?
+      \textbf{Background:} Nel machine learning, l'effetto Rashomon descrive l'esistenza di molteplici modelli con prestazioni predittive equivalenti ma parametri diversi. Questo solleva una questione fondamentale per l'XAI: questi modelli forniscono spiegazioni simili per le stesse previsioni?
 
       \vspace{0.5em}
 
       \noindent
-      \textbf{Metodi:} È stato costruito un Rashomon set di 10 reti neurali convolutional (CNN) con accuratezza entro l'1\% sul dataset MNIST. Per un campione di 100 immagini di test, sono state generate spiegazioni locali utilizzando tre metodi: Saliency, Integrated Gradients (IG) e LIME. Sono state quindi valutate la similarità tra le spiegazioni (tramite SSIM, correlazione di Pearson e Spearman, similarità del coseno e MAE) e la loro fedeltà (utilizzando le curve MoRF e la metrica AOPC).
+      \textbf{Metodi:} È stato costruito un Rashomon set di 10 reti neurali convolutional (CNN) con accuratezza entro l'1\% sul dataset MNIST. Per un campione di 10 immagini di test, sono state generate spiegazioni locali utilizzando tre metodi: Saliency, Integrated Gradients (IG) e LIME. Sono state quindi valutate la similarità tra le spiegazioni (tramite SSIM, correlazione di Pearson e Spearman, similarità del coseno e MAE) e la loro fedeltà (utilizzando le curve MoRF e la metrica AOPC).
 
       \vspace{0.5em}
 
@@ -142,7 +144,7 @@
       \vspace{0.5em}
 
       \noindent
-      \textbf{Conclusioni:} I risultati dimostrano che, in questo contesto, la scelta dell'algoritmo di spiegazione ha un impatto maggiore sulla spiegazione risultante rispetto alla variazione dei parametri del modello. Importante sottolineare l'importanza di valutare sia la similarità che la fedeltà per validare i metodi XAI, specialmente in scenari dove coesistono modelli equivamente accurati.
+      \textbf{Conclusioni:} I risultati dimostrano che, in questo contesto, la scelta dell'algoritmo di spiegazione ha un impatto maggiore sulla spiegazione risultante rispetto alla variazione dei parametri del modello. Importante sottolineare l'importanza di valutare sia la similarità che la fedeltà per validare i metodi XAI, specialmente in scenari dove coesistono modelli equivalentemente accurati.
 \end{abstract}
 \newpage
 
@@ -204,7 +206,7 @@ spiegazione poco utile.
 
 In letteratura non esiste una metrica unica e definitiva per la valutazione
 delle spiegazioni \cite{adadi2018survey}, ma piuttosto un insieme di
-prospettive complementari. Questa tesi adotta quindi una doppia prospettiva:
+prospettive complementari. Viene adottata quindi una doppia prospettiva:
 \begin{itemize}
       \item analisi della \textbf{similarità} tra spiegazioni (intra-modello e
             inter-modello);
@@ -292,7 +294,7 @@ grado di garantire affidabilità, riproducibilità e scalabilità
       \item \textbf{Python 3.x}: linguaggio di riferimento per la ricerca in XAI, scelto per la sua flessibilità e l’ampia disponibilità di librerie specializzate.
       \item \textbf{PyTorch}: libreria \emph{open-source} per il \emph{machine learning} e \emph{deep learning}, dotata di supporto nativo per l’autograd e adatta alla prototipazione rapida di modelli. Utilizzata per la definizione, l’addestramento e la validazione delle reti neurali, nonché per il calcolo dei gradienti richiesto dai metodi \emph{Saliency} e \emph{Integrated Gradients}.
       \item \textbf{Torchvision}: libreria complementare a PyTorch che offre dataset predefiniti (come MNIST), trasformazioni standard per immagini e modelli già pronti. Utilizzata per il download, la gestione e il preprocessing del dataset MNIST.
-      \item \textbf{Captum} \citep{kokhlikyan2020captum}: libreria open source specifica per l’interpretabilità di modelli PyTorch. Fornisce implementazioni ottimizzate di numerosi metodi XAI, con API coerenti e facilmente integrabili. Utilizzata per generare le spiegazioni su tutti i modelli del Rashomon set, includendo metodi \emph{gradient-based} e \emph{model-agnostic}.
+      \item \textbf{Captum} \citep{kokhlikyan2020captum}: libreria open source specifica per l’interpretabilità di modelli PyTorch. Fornisce implementazioni ottimizzate di numerosi metodi XAI, con API coerenti e facilmente integrabili. Utilizzata per generare le spiegazioni su tutti i modelli del Rashomon set, includendo metodi \emph{gradient-based} e \emph{model-agnostic} (\autoref{sec:gradient_vs_model}).
       \item \textbf{NumPy}: libreria fondamentale per il calcolo scientifico e la manipolazione efficiente di array numerici, usata per l’elaborazione dei dati, la normalizzazione delle spiegazioni e il calcolo di metriche.
       \item \textbf{Scikit-learn}: utilizzata per il calcolo di metriche (correlazioni, MAE) e per funzioni di utilità scientifica.
       \item \textbf{SciPy}: impiegata per calcolare correlazioni avanzate come Spearman e Pearson.
@@ -348,7 +350,7 @@ Poiché ogni spiegazione richiede $n\_samples$ forward pass, è stato utilizzato
       \end{tabular}
       \caption{Confronto qualitativo delle mappe LIME prima/dopo il passaggio al masking a patch.
             L’approccio a patch riduce il rumore e mette a fuoco regioni più coerenti con la cifra.
-            Stesse immagini, stesso modello, $n_\mathrm{samples}=200$.}
+            Immagini simili, stesso modello, $n_\mathrm{samples}=200$.}
       \label{fig:lime_before_after}
 \end{figure}
 
@@ -403,10 +405,10 @@ riproducibilità dei risultati.
             \textbf{Parametro}              & \textbf{Valore}                                             \\
             \hline
             Numero di modelli addestrati    & 10                                                          \\
-            Epoche massime                  & 50                                                          \\
-            Patience (early stopping)       & 5 epoche                                                    \\
+            Epoche massime                  & 30                                                          \\
+            Patience (early stopping)       & 3 epoche                                                    \\
             Soglia Rashomon                 & $1\%$ di differenza rispetto al miglior modello (val. acc.) \\
-            Batch size                      & 128                                                         \\
+            Batch size                      & 64                                                          \\
             Baseline IG                     & immagine di zeri                                            \\
             Baseline MoRF                   & media dell’immagine                                         \\
             $n\_samples$ LIME               & 200                                                         \\
@@ -482,6 +484,63 @@ for i in 1 to NUM_MODELS:
         salva_modello(modello)
 \end{lstlisting}
 
+\section{Validazione dell’equivalenza (accuracies)}
+\label{sec:rashomon_equivalenza}
+
+Per verificare l’equivalenza operativa dei modelli selezionati (soglia 1\%
+sulla validation), riportiamo le accuratezze di validazione e test per ciascun
+modello e le statistiche riassuntive sull’insieme.
+
+\begin{table}[H]
+      \centering
+      \begin{minipage}{0.90\linewidth}
+            \centering
+            \renewcommand{\arraystretch}{1.1}
+            \setlength{\tabcolsep}{6pt}
+            \begin{tabular}{rcc}
+                  \hline
+                  \textbf{Model} & \textbf{ValAcc} & \textbf{TestAcc} \\
+                  \hline
+                  9              & 99.08\%         & 99.03\%          \\
+                  1              & 99.03\%         & 99.10\%          \\
+                  8              & 99.03\%         & 99.02\%          \\
+                  3              & 98.97\%         & 98.91\%          \\
+                  4              & 98.95\%         & 99.04\%          \\
+                  2              & 98.98\%         & 98.99\%          \\
+                  7              & 98.89\%         & 98.86\%          \\
+                  5              & 98.88\%         & 98.96\%          \\
+                  0              & 98.83\%         & 99.01\%          \\
+                  6              & 98.59\%         & 98.77\%          \\
+                  \hline
+            \end{tabular}
+            \caption{Accuratezze per modello del Rashomon set (ordinate per ValAcc decrescente).}
+            \label{tab:rashomon_acc_by_model}
+      \end{minipage}
+\end{table}
+
+\begin{table}[H]
+      \centering
+      \begin{minipage}{0.70\linewidth}
+            \centering
+            \renewcommand{\arraystretch}{1.1}
+            \begin{tabular}{lcc}
+                  \hline
+                          & \textbf{Media $\pm$ std} & \textbf{Min..Max}  \\
+                  \hline
+                  ValAcc  & 98.91\% $\pm$ 0.13\%     & 98.59\% .. 99.08\% \\
+                  TestAcc & 98.97\% $\pm$ 0.09\%     & 98.77\% .. 99.10\% \\
+                  \hline
+            \end{tabular}
+            \caption{Statistiche riassuntive sulle accuratezze del Rashomon set ($n=10$ modelli).}
+            \label{tab:rashomon_acc_summary}
+      \end{minipage}
+\end{table}
+
+\noindent
+Le distribuzioni sono strette (dev.\,std $< 0.2$ p.p. su entrambi i set) e
+i range rientrano nella soglia di selezione all’1\%, confermando l’\emph{equivalenza}
+dei modelli ai fini delle analisi di similarità e fedeltà.
+
 \section{Obiettivi}
 La costruzione del Rashomon set serve a due scopi principali:
 \begin{enumerate}
@@ -490,10 +549,10 @@ La costruzione del Rashomon set serve a due scopi principali:
 \end{enumerate}
 
 \section{Approfondimento}
-\section{Equivalenza tra modelli}
+\subsection{Equivalenza tra modelli}
 Nel contesto di questo lavoro, due modelli sono considerati equivalenti se
-soddisfano la condizione di soglia sull’accuratezza definita sopra. Questa
-scelta è in linea con la definizione originaria di \emph{Rashomon set}
+soddisfano la condizione di soglia sull’accuratezza definita precedentemente.
+Questa scelta è in linea con la definizione originaria di \emph{Rashomon set}
 \citep{fisher2019all}, secondo cui l’insieme comprende modelli con prestazioni
 quasi ottimali rispetto al miglior modello ottenuto. L’adozione di tale
 criterio permette di:
@@ -506,7 +565,7 @@ criterio permette di:
             nelle spiegazioni \citep{leventi2023consistency}.
 \end{itemize}
 
-\section{Perché utilizzare l’early stopping}
+\subsection{Perché utilizzare l’early stopping}
 L’\emph{early stopping} \citep{prechelt1998early} è stato adottato per due
 motivi principali:
 \begin{itemize}
@@ -522,13 +581,12 @@ casuali di librerie esterne) \citep{reimers2017reporting}, è possibile
 distinguere la variabilità dovuta al caso da quella legata a differenze
 strutturali nei modelli o nelle spiegazioni.
 
-\section{Scelta dell’ottimizzatore: Adam.}
+\subsection{Scelta dell’ottimizzatore: Adam.}
 Per l’addestramento di tutte le reti neurali è stato utilizzato l’ottimizzatore
 \emph{Adam} (\emph{Adaptive Moment Estimation}) \citep{kingma2014adam},
-ampiamente adottato in ambito \emph{deep learning} per la sua capacità di
-combinare i vantaggi di AdaGrad e RMSProp. Adam adatta dinamicamente il tasso
-di apprendimento per ciascun parametro in base alle stime dei momenti del
-gradiente, permettendo:
+ampiamente adottato in ambito \emph{deep learning}. Adam adatta dinamicamente
+il tasso di apprendimento per ciascun parametro in base alle stime dei momenti
+del gradiente, permettendo:
 \begin{itemize}
       \item Convergenza più rapida rispetto a metodi a tasso di apprendimento fisso.
       \item Maggiore stabilità anche in presenza di gradienti rumorosi, come avviene nei
@@ -601,7 +659,7 @@ La combinazione di questi tre metodi consente di confrontare:
             dell’importanza delle feature \citep{samek2016evaluating,guidotti2018survey}.
 \end{itemize}
 
-\section{Gradient-based vs Model-agnostic}
+\section{Gradient-based vs Model-agnostic} \label{sec:gradient_vs_model}
 I metodi di spiegazione \emph{gradient-based} sfruttano direttamente la
 struttura interna del modello: calcolano come varia la predizione rispetto a
 piccole modifiche delle feature in input, utilizzando le derivate calcolate
@@ -619,15 +677,15 @@ si basano su approssimazioni locali.
 
 \chapter{Valutare la similarità tra spiegazioni}
 
-Quando osserviamo due spiegazioni, possiamo essere tentati di giudicare ``a
-occhio'' se siano simili o meno. Ma le apparenze ingannano: differenze visive
-possono non riflettere reali differenze nei pattern di importanza, e viceversa.
-Nel contesto di un \emph{Rashomon set}, questa domanda diventa cruciale:
-modelli diversi, ma ugualmente accurati, arrivano alle stesse conclusioni per
-motivi simili, o per motivi profondamente diversi? Misurare la similarità tra
-spiegazioni è un passo fondamentale per capire la robustezza e la stabilità
-delle interpretazioni fornite dai metodi di \emph{eXplainable AI} (XAI)
-\citep{samek2016evaluating, mueller2023rashomon}.
+Quando osserviamo due spiegazioni, possiamo essere tentati di giudicare
+istintivamente se siano simili o meno. Ma le apparenze ingannano: differenze
+visive possono non riflettere reali differenze nei pattern di importanza, e
+viceversa. Nel contesto di un \emph{Rashomon set}, questa domanda diventa
+cruciale: modelli diversi, ma ugualmente accurati, arrivano alle stesse
+conclusioni per motivi simili, o per motivi profondamente diversi? Misurare la
+similarità tra spiegazioni è un passo fondamentale per capire la robustezza e
+la stabilità delle interpretazioni fornite dai metodi di \emph{eXplainable AI}
+(XAI) \citep{samek2016evaluating, mueller2023rashomon}.
 
 \section{Metriche adottate}
 Per trasformare un concetto qualitativo come ``somiglianza visiva'' in numeri,
@@ -683,34 +741,39 @@ Le tabelle seguenti riassumono i valori medi delle metriche nei due scenari.
 \FloatBarrier
 \Needspace{18\baselineskip}
 
-\begin{tabindent}
-      \renewcommand{\arraystretch}{1.1}
-      \begin{tabular}{lccccc c}
-            \hline
-            \textbf{Coppia} & \textbf{SSIM}     & \textbf{Pearson}  & \textbf{Spearman} & \textbf{Cosine}   & \textbf{MAE}      & \textbf{n} \\
-            \hline
-            Saliency–IG     & 0.263 $\pm$ 0.064 & 0.529 $\pm$ 0.082 & 0.194 $\pm$ 0.052 & 0.651 $\pm$ 0.045 & 0.211 $\pm$ 0.059 & 100        \\
-            Saliency–LIME   & 0.178 $\pm$ 0.043 & 0.468 $\pm$ 0.063 & 0.392 $\pm$ 0.089 & 0.663 $\pm$ 0.037 & 0.177 $\pm$ 0.045 & 100        \\
-            IG–LIME         & 0.247 $\pm$ 0.054 & 0.421 $\pm$ 0.059 & 0.224 $\pm$ 0.059 & 0.780 $\pm$ 0.056 & 0.167 $\pm$ 0.046 & 100        \\
-            \hline
-      \end{tabular}
+\begin{table}[H]
+      \centering
+      \renewcommand{\arraystretch}{1.05}
+      \begin{adjustbox}{max width=\linewidth}
+            \begin{tabular}{lccccc c}
+                  \hline
+                  \textbf{Coppia} & \textbf{SSIM}     & \textbf{Pearson}  & \textbf{Spearman} & \textbf{Cosine}   & \textbf{MAE}      & \textbf{n} \\
+                  \hline
+                  Saliency–IG     & 0.263 $\pm$ 0.064 & 0.529 $\pm$ 0.082 & 0.194 $\pm$ 0.052 & 0.651 $\pm$ 0.045 & 0.211 $\pm$ 0.059 & 100        \\
+                  Saliency–LIME   & 0.178 $\pm$ 0.043 & 0.468 $\pm$ 0.063 & 0.392 $\pm$ 0.089 & 0.663 $\pm$ 0.037 & 0.177 $\pm$ 0.045 & 100        \\
+                  IG–LIME         & 0.247 $\pm$ 0.054 & 0.421 $\pm$ 0.059 & 0.224 $\pm$ 0.059 & 0.780 $\pm$ 0.056 & 0.167 $\pm$ 0.046 & 100        \\
+                  \hline
+            \end{tabular}
+      \end{adjustbox}
       \caption{Similarità \emph{intra-modello}: confronto tra metodi sullo stesso modello (media $\pm$ dev. std).}
       \label{tab:sim_intra}
-\end{tabindent}
+\end{table}
 
 \vspace{-0.3\baselineskip}
 
 \begin{tabindent}
       \renewcommand{\arraystretch}{1.1}
-      \begin{tabular}{lccccc c}
-            \hline
-            \textbf{Metodo} & \textbf{SSIM}     & \textbf{Pearson}  & \textbf{Spearman} & \textbf{Cosine}   & \textbf{MAE}      & \textbf{n} \\
-            \hline
-            Saliency        & 0.439 $\pm$ 0.067 & 0.612 $\pm$ 0.064 & 0.688 $\pm$ 0.062 & 0.727 $\pm$ 0.042 & 0.069 $\pm$ 0.012 & 450        \\
-            IG              & 0.711 $\pm$ 0.077 & 0.723 $\pm$ 0.079 & 0.516 $\pm$ 0.085 & 0.970 $\pm$ 0.013 & 0.083 $\pm$ 0.049 & 450        \\
-            LIME            & 0.639 $\pm$ 0.086 & 0.864 $\pm$ 0.051 & 0.541 $\pm$ 0.116 & 0.929 $\pm$ 0.028 & 0.093 $\pm$ 0.025 & 450        \\
-            \hline
-      \end{tabular}
+      \begin{adjustbox}{max width=\linewidth}
+            \begin{tabular}{lccccc c}
+                  \hline
+                  \textbf{Metodo} & \textbf{SSIM}     & \textbf{Pearson}  & \textbf{Spearman} & \textbf{Cosine}   & \textbf{MAE}      & \textbf{n} \\
+                  \hline
+                  Saliency        & 0.439 $\pm$ 0.067 & 0.612 $\pm$ 0.064 & 0.688 $\pm$ 0.062 & 0.727 $\pm$ 0.042 & 0.069 $\pm$ 0.012 & 450        \\
+                  IG              & 0.711 $\pm$ 0.077 & 0.723 $\pm$ 0.079 & 0.516 $\pm$ 0.085 & 0.970 $\pm$ 0.013 & 0.083 $\pm$ 0.049 & 450        \\
+                  LIME            & 0.639 $\pm$ 0.086 & 0.864 $\pm$ 0.051 & 0.541 $\pm$ 0.116 & 0.929 $\pm$ 0.028 & 0.093 $\pm$ 0.025 & 450        \\
+                  \hline
+            \end{tabular}
+      \end{adjustbox}
       \caption{Similarità \emph{inter-modello}: stesso metodo su modelli diversi (media $\pm$ dev. std).}
       \label{tab:sim_inter}
 \end{tabindent}
@@ -773,7 +836,7 @@ $0.392 \pm 0.089$).
 
 Misurare la similarità tra spiegazioni è utile per capire se due metodi
 ``raccontano la stessa storia''. Ma una spiegazione può anche essere coerente e
-stabile, eppure irrilevante per il modello. Per questo serve valutare la
+stabile, eppure irrilevante per il modello. Per tale motivo serve valutare la
 \emph{fedeltà}: le feature indicate come rilevanti sono davvero quelle che
 guidano la decisione del modello?
 
