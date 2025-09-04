@@ -47,7 +47,7 @@ val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
 test_loader = DataLoader(mnist_test, batch_size=BATCH_SIZE)
 
 
-# Funzione per creare la feature mask per LIME
+# funzione per creare la feature mask per LIME
 def create_feature_mask(patch=4):
     H = W = 28
     h_blocks, w_blocks = H // patch, W // patch
@@ -56,7 +56,7 @@ def create_feature_mask(patch=4):
     feature_ids = (row_ids.unsqueeze(1) * w_blocks + col_ids).to(dtype=torch.long)
     return feature_ids.unsqueeze(0).unsqueeze(0)  # [1,1,28,28]
 
-# Funzione di valutazione
+# funzione di valutazione
 def evaluate_accuracy(model, loader, device='cpu'):
     model.eval()
     correct = total = 0
@@ -136,7 +136,7 @@ def train_one_model(seed):
             patience_counter += 1
             if patience_counter >= PATIENCE:
                 break
-    # Carica i pesi migliori
+    # carica i pesi migliori
     model.load_state_dict(best_weights)
     return model, best_val_acc
 
@@ -195,13 +195,13 @@ for i, m in enumerate(rashomon_models):
         "test_acc": test_acc
     })
 
-# Stampa tabella ordinata per val_acc decrescente
+# stampa tabella ordinata per val_acc decrescente
 rashomon_metrics.sort(key=lambda r: r["val_acc"], reverse=True)
 print(f"{'Model':>5}  {'ValAcc':>8}  {'TestAcc':>8}")
 for r in rashomon_metrics:
     print(f"{r['model_id']:>5}  {r['val_acc']*100:8.2f}%  {r['test_acc']*100:8.2f}%")
 
-# Riassunto (media ± std, min/max)
+# riassunto (media ± std, min/max)
 val_list  = [r["val_acc"] for r in rashomon_metrics]
 test_list = [r["test_acc"] for r in rashomon_metrics]
 
@@ -219,7 +219,7 @@ print("\n" + "="*50)
 print("Generazione Spiegazioni")
 print("="*50)
 
-# Parametri spiegazioni
+# parametri spiegazioni
 EXPL_METHODS = ['saliency', 'ig', 'lime']
 
 def generate_saliency(model, sample, label):
@@ -245,9 +245,9 @@ def generate_lime(model, sample, label):
     attr = explainer.attribute(
         sample,
         target=label,
-        n_samples=200,                     # più campioni
+        n_samples=200,                    
         feature_mask=FEATURE_MASK.to(sample.device),
-        perturbations_per_eval=50,          # batch su CPU
+        perturbations_per_eval=50,         # batch su CPU
         baselines=baseline_val
     )
     arr = attr.squeeze().cpu().detach().numpy()
@@ -264,17 +264,16 @@ def generate_explanations(model, sample, label):
         explanations['lime'] = generate_lime(model, sample, label)    
     return explanations
 
-# Esempio di utilizzo sul Rashomon set
 
 SAMPLE_SIZE = 10
-# scegli immagini casuali dal test set
+# immagini casuali dal test set
 sample_indices = np.random.choice(len(mnist_test), SAMPLE_SIZE, replace=False)
 sample_imgs = torch.stack([mnist_test[i][0] for i in sample_indices])
 sample_labels = torch.tensor([mnist_test[i][1] for i in sample_indices])
 
 device = torch.device("cpu")
 
-# Struttura per risultati
+# struttura per risultati
 explanations_all = []
 
 for model_idx, model in enumerate(rashomon_models):
@@ -352,7 +351,7 @@ for m1, m2 in combinations(EXPL_METHODS, 2):
 
 # Per ogni immagine del campione
 for img_idx in tqdm(range(SAMPLE_SIZE)):
-    # Intra-modello (confronta metodi diversi sullo stesso modello)
+    # intra-modello (confronta metodi diversi sullo stesso modello)
     for model_id, model_exps in all_explanations.items():
         methods = list(model_exps[img_idx].keys())
         for m1, m2 in combinations(methods, 2):
@@ -363,7 +362,7 @@ for img_idx in tqdm(range(SAMPLE_SIZE)):
             for i, metric in enumerate(SIM_METRICS):
                 similarity_results[f"{m1}-{m2}"]['same_model'][metric].append(sim_vals[i])
 
-    # Inter-modello (confronta lo stesso metodo tra modelli diversi)
+    # inter-modello (confronta lo stesso metodo tra modelli diversi)
     for method in EXPL_METHODS:
         model_exps = [all_explanations[model_id][img_idx][method] for model_id in all_explanations]
         for exp1, exp2 in combinations(model_exps, 2):
@@ -372,7 +371,7 @@ for img_idx in tqdm(range(SAMPLE_SIZE)):
                 similarity_results[method]['diff_model'][metric].append(sim_vals[i])
                 
 # Stampa risultati medi
-# ---- INTRA: tra metodi, stesso modello (SOLO COPPIE) ----
+# INTRA:
 print("\nRisultati similarità INTRA-modello (tra metodi, stesso modello):")
 pair_keys = [f"{m1}-{m2}" for m1, m2 in combinations(EXPL_METHODS, 2)]
 for key in pair_keys:
@@ -387,7 +386,7 @@ for key in pair_keys:
         else:
             print("  {0}: n/d".format(metric))
 
-# ---- INTER: stesso metodo, modelli diversi (SOLO METODI) ----
+# INTER: 
 print("\nRisultati similarità INTER-modello (stesso metodo, modelli diversi):")
 for method in EXPL_METHODS:
     print(f"{method}:")
@@ -432,7 +431,7 @@ def morf_curve_aopc(model, image, explanation, true_class, steps=10, device='cpu
     aopc = np.mean(diffs)
     return aopc, probas
 
-# === Calcolo MoRF per ogni modello, metodo, immagine campione ===
+# calcolo MoRF per ogni modello, metodo, immagine campione
 
 print("\n" + "="*50)
 print("VALUTAZIONE QUALITÀ SPIEGAZIONI (MoRF)")
@@ -511,7 +510,7 @@ def plot_explanations_grid(
 
 plot_explanations_grid(explanations_all, sample_imgs, sample_labels, methods=['saliency', 'ig', 'lime'])
 
-# === CALCOLO E PLOT DELLE CURVE MORF MEDIE ===
+# CALCOLO E PLOT DELLE CURVE MORF MEDIE
 
 avg_curves = {m: np.zeros(STEPS_MORF + 1) for m in EXPL_METHODS}
 counts = {m: 0 for m in EXPL_METHODS}
@@ -527,11 +526,11 @@ for model_idx, model in enumerate(rashomon_models):
             avg_curves[method] += np.array(probas)
             counts[method] += 1
 
-# Media sulle immagini e modelli
+# media sulle immagini e modelli
 for m in EXPL_METHODS:
     avg_curves[m] /= counts[m]
 
-# --- Plot ---
+# plot
 steps = np.linspace(0, 100, STEPS_MORF + 1)  # % feature rimosse
 plt.figure(figsize=(6, 4))
 for method in EXPL_METHODS:
@@ -543,5 +542,5 @@ plt.title("Curve MoRF medie")
 plt.grid(True)
 plt.legend()
 plt.tight_layout()
-plt.savefig("morf_curves.png", dpi=300)  # Salva immagine per LaTeX
+plt.savefig("morf_curves.png", dpi=300) 
 plt.show()
