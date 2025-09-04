@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader, random_split, Subset
+from torch.utils.data import DataLoader, random_split
 import numpy as np
 import random
 from tqdm import tqdm
