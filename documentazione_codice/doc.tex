@@ -49,6 +49,7 @@
 \usepackage[labelfont=bf,font=small]{caption}
 
 \usepackage{amsmath} 
+\usepackage{amssymb} % Needed for \mathbb
 \numberwithin{figure}{chapter}
 \numberwithin{table}{chapter}
 
@@ -88,6 +89,8 @@
 \usepackage{changepage}            
 
 \usepackage{adjustbox}
+\usepackage{tabularx}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
 
 \setcounter{topnumber}{2}
 \setcounter{bottomnumber}{2}
@@ -129,8 +132,7 @@
 
 \begin{abstract}
       \noindent
-      \textbf{Background:} Nel machine learning, l'effetto Rashomon descrive l'esistenza di molteplici modelli con prestazioni predittive equivalenti ma parametri diversi. Questo solleva una questione fondamentale per l'XAI: questi modelli forniscono spiegazioni simili per le stesse previsioni?
-
+      \textbf{Background:} Nel machine learning, l’\emph{effetto Rashomon} denota la presenza — per uno stesso compito e lo stesso split dei dati — di molteplici modelli tra loro diversi (architetture, pesi, regole interne) che ottengono prestazioni comparabili; questa molteplicità implica che anche le spiegazioni possano divergere pur a parità di accuratezza.
       \vspace{0.5em}
 
       \noindent
@@ -157,9 +159,10 @@
 \chapter{Introduzione}
 
 Quando ci affidiamo ai metodi di spiegazione per i modelli di \emph{machine
-      learning}, sorge una domanda cruciale: \textit{quanto sono simili le
-      spiegazioni prodotte da diversi algoritmi o modelli, e come possiamo misurare
-      questa similarità?}
+      learning}, sorge una domanda cruciale: \textit{fissato un metodo di
+      spiegazione, quanto sono stabili (sez.~\ref{sec:stabilita}) le spiegazioni al
+      variare del modello all’interno del Rashomon set, e come possiamo quantificarne
+      la variabilità?}
 
 Nel contesto del \emph{Rashomon effect}
 \cite{mueller2023rashomon,leventi2023consistency}, in cui coesistono molteplici
@@ -213,14 +216,6 @@ prospettive complementari. Viene adottata quindi una doppia prospettiva:
       \item analisi della \textbf{fedeltà} tramite MoRF e \emph{Area Over the Perturbation
                   Curve} (AOPC).
 \end{itemize}
-
-L’obiettivo finale è indagare se e come l’effetto Rashomon si manifesti non
-solo nelle predizioni, ma anche nell’interpretabilità\footnote{In letteratura
-      XAI, per interpretabilità si intende la possibilità di associare in modo
-      comprensibile le decisioni di un modello alle caratteristiche rilevanti dei
-      dati. Non va confusa con la sola \emph{fedeltà}, che riguarda invece quanto la
-      spiegazione rifletta fedelmente il funzionamento interno del modello.},
-valutando la coerenza e l’affidabilità dei metodi XAI in scenari controllati.
 
 \chapter{Introduzione all’implementazione sperimentale}
 
@@ -374,13 +369,20 @@ introdurre pattern artificiali fuori distribuzione che avrebbero potuto
 alterare il comportamento del modello \citep{samek2016evaluating}.
 
 \paragraph{Selezione del Rashomon set.}
-La scelta dei modelli è stata guidata dalla \textit{validation accuracy},
-selezionando tutti quelli entro l’1\% dal miglior modello, seguendo la
-definizione operativa di \citet{mueller2023rashomon}. Questo garantisce che le
-differenze osservate nelle spiegazioni non siano dovute a variazioni
-significative in termini di performance di classificazione. Ogni modello è
-stato salvato in formato \texttt{.pt} di PyTorch, assicurando la
-riproducibilità esatta delle sperimentazioni.
+Per ogni inizializzazione (seed) il modello viene addestrato sul
+\textbf{training set} e monitorato sul \textbf{validation set} per
+l'\emph{early stopping}: si salva il \emph{checkpoint} con la miglior
+prestazione in validazione (miglior \emph{validation accuracy}, con pazienza
+\texttt{patience}=3) e l'addestramento si interrompe quando non si osservano
+ulteriori miglioramenti. Concluso il training, i modelli sono selezionati in
+base alla \textbf{validation accuracy}: tutti quelli con accuratezza $\geq$
+(\emph{best} $-\,1\%$) entrano nel \emph{Rashomon set}
+(\citealp{mueller2023rashomon}). Solo dopo aver concluso il set, i checkpoint
+selezionati vengono valutati sul \textbf{test set} per ottenere una stima
+imparziale della generalizzazione; il test non è usato per scegliere modelli o
+iperparametri (evitando data leakage). Tutti i pesi selezionati sono salvati in
+formato \texttt{.pt} di PyTorch, con semi fissati, per garantire la
+riproducibilità delle sperimentazioni.
 
 \paragraph{Classe di riferimento per le attribuzioni.}
 Le attribuzioni sono calcolate rispetto alla \textbf{classe vera} (\textit{true
@@ -427,14 +429,21 @@ riproducibilità dei risultati.
 
 \chapter{Il Rashomon set}
 
-Il \emph{Rashomon set} è una collezione di modelli diversi che ottengono
-prestazioni simili su un determinato compito. Il termine deriva
-dall’\emph{effetto Rashomon}, che descrive la possibilità che più spiegazioni,
-tutte coerenti con i dati osservati, possano emergere per lo stesso fenomeno
-\citep{mueller2023rashomon}. In ambito \emph{machine learning}, ciò implica
-che, anche a parità di accuratezza, modelli con parametri differenti possono
-fornire spiegazioni distinte per le proprie decisioni
-\citep{fisher2019all,semenova2019existence}.
+Il \emph{Rashomon set} è l’insieme dei modelli che, per uno stesso compito e lo
+stesso split dei dati, ottengono prestazioni quasi ottimali (entro una soglia
+$\varepsilon$ dal migliore). La coesistenza di molteplici soluzioni
+predittivamente equivalenti è nota come \emph{effetto Rashomon}
+\citep{fisher2019all,mueller2023rashomon}. In ambito XAI, questa molteplicità
+implica che differenze nelle spiegazioni possano riflettere \emph{variazioni
+      tra modelli} anche a parità di accuratezza, non necessariamente errori o rumore
+\citep{semenova2019existence}. Per isolare l’effetto dovuto ai modelli è quindi
+cruciale \textbf{fissare il metodo di spiegazione} e confrontare le
+attribuzioni \emph{tra modelli} (analisi inter–modello). Al contrario, il
+confronto \emph{tra metodi} sullo stesso modello quantifica la variabilità
+indotta dallo strumento XAI e non l’effetto Rashomon in senso stretto. Sono
+stati adottati entrambi i piani: (i) inter–modello a metodo fissato, per
+misurare la stabilità entro il Rashomon set; (ii) intra–modello, per
+confrontare i metodi a parità di modello.
 
 \section{Costruzione}
 Il Rashomon set è stato costruito allenando più reti neurali della stessa
@@ -444,44 +453,73 @@ addestrata sugli stessi dati con un protocollo identico, che include la
 suddivisione in training, validation e test set.
 
 Durante l’addestramento è stata applicata la tecnica di \emph{early stopping}
-\citep{prechelt1998early}: per ogni modello, l’allenamento viene interrotto se
-le prestazioni sul validation set non migliorano per un numero prestabilito di
-epoche consecutive. In questo modo si seleziona automaticamente la versione del
-modello che ha ottenuto la miglior accuratezza sul validation, riducendo il
+\citep{prechelt1998early}: per ogni modello, l’addestramento viene interrotto
+se le prestazioni sul validation set non migliorano per un numero prestabilito
+di epoche consecutive. In questo modo si seleziona automaticamente la versione
+del modello che ha ottenuto la miglior accuratezza sul validation, riducendo il
 rischio di overfitting e garantendo un confronto equo tra i membri del set.
 
 \section{Selezione}
-Al termine dell’addestramento, sono stati selezionati tutti i modelli che
-ottenevano un’accuratezza sul validation entro una certa soglia rispetto al
-modello con la miglior performance. In questo esperimento la soglia è pari
-all’1\%:
-
+Per ciascun seed il modello è addestrato sul \textbf{training set} e monitorato
+sul \textbf{validation set} con \emph{early stopping}; si conserva il
+\emph{checkpoint} con la miglior prestazione in validazione (best in
+validation). La costruzione del \emph{Rashomon set} avviene sulla base della
+\textbf{validation accuracy} del checkpoint migliore: si includono tutti i
+modelli entro l’1\% dal migliore, ovvero
 \[
-      \mathrm{Accuracy}_{\mathrm{val}}(m) \geq \mathrm{Accuracy}_{\mathrm{val}}(m_{\mathrm{best}}) - \epsilon
+      \mathrm{Accuracy}_{\mathrm{val}}(m) \;\ge\;
+      \mathrm{Accuracy}_{\mathrm{val}}(m_{\mathrm{best}}) - \epsilon
 \]
 dove:
 \begin{itemize}
-      \item $\mathrm{Accuracy}_{\mathrm{val}}(m_{\mathrm{best}})$ è la miglior accuratezza sul validation ottenuta tra tutti i modelli addestrati;
-      \item $\epsilon$ è la tolleranza fissata (0.01 in questo caso), in linea con la definizione operativa di Rashomon set \citep{fisher2019all}.
+      \item $\mathrm{Accuracy}_{\mathrm{val}}(m_{\mathrm{best}})$ è la massima accuratezza in validazione
+            tra i modelli addestrati (valutata sul loro \emph{best checkpoint});
+      \item $\epsilon = 0{.}01$ è la tolleranza (1\%), in linea con la definizione operativa di
+            \emph{Rashomon set} \citep{fisher2019all}.
 \end{itemize}
 
-Questo criterio garantisce che i modelli selezionati siano equivalenti dal
-punto di vista delle prestazioni predittive, pur potendo avere rappresentazioni
-interne e logiche decisionali differenti
+Solo \textbf{dopo} aver chiuso il set secondo questa regola, i checkpoint
+selezionati sono valutati sul \textbf{test set} per ottenere una stima
+imparziale della generalizzazione: il test non è mai usato per la selezione,
+prevenendo \emph{data leakage}
 \citep{leventi2023consistency,mueller2023rashomon}.
 
-\begin{lstlisting}[caption={Addestramento modelli e selezione Rashomon set}, label={lst:rashomon_training}]
-for i in 1 to NUM_MODELS:
-    imposta_seed(SEED + i)
-    
-    modello, acc_validazione = addestra_modello(dati_train, dati_val)
-    
-    if acc_validazione > best_acc_validazione:
-        aggiorna_best_accuracy(acc_validazione)
+\begin{lstlisting}[caption={Training con early stopping, selezione su validation ed evaluation su test}, label={lst:rashomon_training}]
+best_val_acc = -inf
+val_acc_per_model = []
+checkpoints = []
 
-    if acc_validazione >= best_acc_validazione - SOGLIA_RASHOMON:
-        aggiungi_a_rashomon_set(modello)
-        salva_modello(modello)
+for i in 1..NUM_MODELS:
+    set_seed(SEED + i)
+
+    # addestra su TRAIN, monitora VALIDATION con early stopping
+    model = init_model()
+    hist = train_with_early_stopping(
+              model, train_data, val_data,
+              monitor="validation",  # loss o accuracy
+              patience=PATIENCE)
+
+    load_best_checkpoint(model, hist)
+
+    acc_val = evaluate_accuracy(model, val_data)
+    val_acc_per_model.append(acc_val)
+    checkpoints.append(save_checkpoint(model))
+
+    if acc_val > best_val_acc:
+        best_val_acc = acc_val
+
+# selezione Rashomon set su VALIDATION
+RASHOMON = []
+for i, acc_val in enumerate(val_acc_per_model):
+    if acc_val >= best_val_acc - EPSILON:     # EPSILON = 0.01
+        RASHOMON.append(checkpoints[i])
+
+# valutazione finale su TEST 
+test_scores = []
+for ckpt in RASHOMON:
+    model = load_checkpoint(ckpt)
+    acc_test = evaluate_accuracy(model, test_data)
+    test_scores.append(acc_test)
 \end{lstlisting}
 
 \section{Validazione dell’equivalenza (accuracies)}
@@ -501,8 +539,8 @@ modello e le statistiche riassuntive sull’insieme.
                   \hline
                   \textbf{Model} & \textbf{ValAcc} & \textbf{TestAcc} \\
                   \hline
-                  9              & 99.08\%         & 99.03\%          \\
-                  1              & 99.03\%         & 99.10\%          \\
+                  9              & 99.10\%         & 99.08\%          \\
+                  1              & 99.03\%         & 99.16\%          \\
                   8              & 99.03\%         & 99.02\%          \\
                   3              & 98.97\%         & 98.91\%          \\
                   4              & 98.95\%         & 99.04\%          \\
@@ -513,7 +551,7 @@ modello e le statistiche riassuntive sull’insieme.
                   6              & 98.59\%         & 98.77\%          \\
                   \hline
             \end{tabular}
-            \caption{Accuratezze per modello del Rashomon set (ordinate per ValAcc decrescente).}
+            \caption{Accuratezze per modello del Rashomon set.}
             \label{tab:rashomon_acc_by_model}
       \end{minipage}
 \end{table}
@@ -527,8 +565,8 @@ modello e le statistiche riassuntive sull’insieme.
                   \hline
                           & \textbf{Media $\pm$ std} & \textbf{Min..Max}  \\
                   \hline
-                  ValAcc  & 98.91\% $\pm$ 0.13\%     & 98.59\% .. 99.08\% \\
-                  TestAcc & 98.97\% $\pm$ 0.09\%     & 98.77\% .. 99.10\% \\
+                  ValAcc  & 98.87\% $\pm$ 0.17\%     & 98.59\% .. 99.10\% \\
+                  TestAcc & 98.96\% $\pm$ 0.11\%     & 98.77\% .. 99.16\% \\
                   \hline
             \end{tabular}
             \caption{Statistiche riassuntive sulle accuratezze del Rashomon set ($n=10$ modelli).}
@@ -540,13 +578,6 @@ modello e le statistiche riassuntive sull’insieme.
 Le distribuzioni sono strette (dev.\,std $< 0.2$ p.p. su entrambi i set) e
 i range rientrano nella soglia di selezione all’1\%, confermando l’\emph{equivalenza}
 dei modelli ai fini delle analisi di similarità e fedeltà.
-
-\section{Obiettivi}
-La costruzione del Rashomon set serve a due scopi principali:
-\begin{enumerate}
-      \item \textbf{Studiare la variabilità delle spiegazioni}: se modelli ugualmente accurati forniscono spiegazioni simili, allora queste possono essere considerate robuste; se divergono, si manifesta l’effetto Rashomon anche nell’interpretabilità \citep{mueller2023rashomon}.
-      \item \textbf{Testare i metodi di spiegazione}: usando un insieme di modelli equivalenti, è possibile valutare la coerenza e la fedeltà delle spiegazioni prodotte da diversi algoritmi XAI \citep{leventi2023consistency}.
-\end{enumerate}
 
 \section{Approfondimento}
 \subsection{Equivalenza tra modelli}
@@ -705,6 +736,42 @@ similarità: dalla struttura globale all’ordine delle feature, fino alla
 corrispondenza numerica esatta \citep{leventi2023consistency,
       samek2016evaluating}.
 
+\paragraph{Range e interpretazione delle metriche.}
+Per ogni metrica vengono specificati: il \textbf{range teorico}, il
+\textbf{range nel setup} (dopo min–max normalizzazione delle mappe in $[0,1]$),
+la \textbf{direzione di miglioramento} ($\uparrow$ (alto) meglio / $\downarrow$ (basso)
+meglio) e il significato pratico del valore.
+
+\begin{table}[H]
+      \centering
+      \begin{minipage}{0.98\linewidth}
+            \small
+            \setlength{\tabcolsep}{5pt}
+            \renewcommand{\arraystretch}{1.15}
+            \begin{tabularx}{\linewidth}{l c c c Y}
+                  \hline
+                  \textbf{Metrica}  & \textbf{Range teorico} & \textbf{Range setup} & \textbf{Migliore} & \textbf{Interpretazione}                                                                             \\
+                  \hline
+                  SSIM              & $[-1,1]$               & $[0,1]$            & $\uparrow$      &
+                  Somiglianza strutturale (luminanza/contrasto/struttura). Con mappe in $[0,1]$ e \texttt{data\_range=1.0}, valori $\to 1$ indicano pattern quasi identici; $\approx 0$ bassa somiglianza. \\
+                  Pearson ($r$)     & $[-1,1]$               & $[-1,1]$           & $\uparrow$      &
+                  Correlazione lineare: $1$ = forte accordo, $0$ = nessuna dipendenza, $<0$ = inversione.                                                                                                  \\
+                  Spearman ($\rho$) & $[-1,1]$               & $[-1,1]$           & $\uparrow$      &
+                  Correlazione di rango: $1$ stesso ordinamento, $0$ indipendenza, $<0$ ordinamenti opposti.                                                                                               \\
+                  Cosine            & $[-1,1]$               & $[0,1]$            & $\uparrow$      &
+                  Allineamento direzionale dei vettori: $\to 1$ molto allineati, $\approx 0$ ortogonali. Con mappe non negative i valori sono $\ge 0$.                                                     \\
+                  MAE               & $[0,\infty]$           & $[0,1]$            & $\downarrow$    &
+                  Differenza media assoluta punto-a-punto: $0$ = mappe identiche.                                                                                                                          \\
+                  \hline
+            \end{tabularx}
+            \caption{Range, direzione e interpretazione delle metriche di similarità.}
+            \label{tab:metrics_range_interpretation}
+      \end{minipage}
+\end{table}
+
+\noindent
+\textit{Nota:} in tutto il lavoro le mappe di attribuzione sono normalizzate in $[0,1]$ prima del calcolo delle metriche; per SSIM viene utilizzato \texttt{data\_range=1.0}. Questo rende i valori tra metodi e modelli comparabili e “lega” MAE all’intervallo $[0,1]$.
+
 \section{Procedura di confronto}
 Il confronto è stato condotto calcolando le metriche per ogni immagine del test
 set e per ogni coppia di spiegazioni, considerando due scenari distinti
@@ -734,6 +801,27 @@ classificazione alterino il confronto. Tuttavia, essa rappresenta una
 potenziale minaccia alla validità esterna: in scenari reali, la classe vera
 potrebbe non essere disponibile e il comportamento del metodo rispetto alla
 classe predetta potrebbe differire in modo significativo.
+
+\subsection{Definizione operativa di stabilità}
+\label{sec:stabilita}
+Viene chiamata \textbf{stabilità} di un metodo di spiegazione la capacità di
+produrre spiegazioni simili al variare di fattori che non dovrebbero alterarne
+il contenuto informativo. In questo lavoro la nozione principale è la
+\emph{stabilità inter-modello}: fissato un metodo
+$a$ e una famiglia di modelli $\mathcal{M}$ con prestazioni equivalenti, le
+spiegazioni $E_a(x;m)$ restano coerenti al variare di $m \in \mathcal{M}$.
+
+Operativamente, per ogni immagine $x$ e per ogni coppia di modelli $(m_i,m_j)$
+del Rashomon set, misuriamo una similarità $\mathrm{sim}(\cdot,\cdot)$ (SSIM,
+Pearson, Spearman, Cosine, MAE) tra le mappe di attribuzione, e definiamo un
+indice di stabilità come media (e dispersione) delle similarità:
+\[
+      S_{\text{inter}}(a)
+      = \mathbb{E}_{x}\,\mathbb{E}_{i<j}\big[\,\mathrm{sim}\big(E_a(x;m_i),E_a(x;m_j)\big)\,\big].
+\]
+Valori medi alti e deviazioni standard basse indicano alta stabilità. Notiamo
+che \emph{stabilità} non implica \emph{fedeltà}: un metodo può essere molto
+stabile ma poco fedele, e viceversa (sez.~\ref{sec:morf_aopc}).
 
 \section{Risultati quantitativi}
 Le tabelle seguenti riassumono i valori medi delle metriche nei due scenari.
@@ -841,6 +929,7 @@ stabile, eppure irrilevante per il modello. Per tale motivo serve valutare la
 guidano la decisione del modello?
 
 \section{Procedura MoRF}
+\label{sec:morf_aopc}
 Il metodo \emph{Most Relevant First} (MoRF) è un approccio standard in
 letteratura per testare la fedeltà delle mappe di importanza
 \citep{samek2016evaluating,samek2017explainable}. L’idea è semplice: se le
@@ -1050,6 +1139,6 @@ architetture eterogenee e metodi di spiegazione avanzati.
 
 \clearpage
 \bibliographystyle{plainnat} % coerente con natbib numeric compressed
-\bibliography{references_base}
+\bibliography{references}
 
 \end{document}

@@ -30,6 +30,8 @@ EPOCHS = 30
 BATCH_SIZE = 64
 PATIENCE = 3             # Early stopping patience
 
+MIN_DELTA = 1e-4         # miglioramento minimo richiesto sulla val loss
+
 SAVE_DIR = "rashomon_models"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
@@ -58,6 +60,7 @@ def create_feature_mask(patch=4):
 
 # funzione di valutazione
 def evaluate_accuracy(model, loader, device='cpu'):
+    model = model.to(device)
     model.eval()
     correct = total = 0
     with torch.no_grad():
@@ -97,16 +100,20 @@ def train_one_model(seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
+
     model = SimpleCNN()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     criterion = nn.CrossEntropyLoss()
 
-    best_val_acc = 0.0
+    # tengono conto della migliore epoca su validation
+    best_val_loss = None
+    best_val_acc  = 0.0
+    best_weights  = None
+    
     patience_counter = 0
-    best_weights = None
 
     for epoch in range(EPOCHS):
-        # Training
+        # TRAIN
         model.train()
         for data, target in train_loader:
             optimizer.zero_grad()
@@ -114,30 +121,40 @@ def train_one_model(seed):
             loss = criterion(output, target)
             loss.backward()
             optimizer.step()
-            
-        # Validation
+
+        # VALIDATION
         model.eval()
+        val_loss_sum = 0.0
         correct = 0
         total = 0
         with torch.no_grad():
             for data, target in val_loader:
                 output = model(data)
+                batch_loss = criterion(output, target).item()
+                val_loss_sum += batch_loss * data.size(0)  # somma pesata
                 pred = output.argmax(dim=1)
                 correct += (pred == target).sum().item()
-                total += target.size(0)
-        val_acc = correct / total
+                total   += target.size(0)
 
-        # Early stopping
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
-            best_weights = model.state_dict()
+        val_loss = val_loss_sum / max(total, 1)
+        val_acc  = correct / max(total, 1)
+
+        # EARLY STOPPING: migliora se la val_loss diminuisce di almeno MIN_DELTA
+        if (best_val_loss is None) or (best_val_loss - val_loss > MIN_DELTA):
+            # MIGLIORAMENTO SUFFICIENTE
+            best_val_loss = val_loss
+            best_val_acc  = val_acc
+            best_weights  = model.state_dict()  # checkpoint
             patience_counter = 0
         else:
+            # NESSUN miglioramento “abbastanza grande”
             patience_counter += 1
             if patience_counter >= PATIENCE:
-                break
-    # carica i pesi migliori
-    model.load_state_dict(best_weights)
+                break # ferma il training
+
+    # ripristina il checkpoint migliore su VALIDATION
+    if best_weights is not None:
+        model.load_state_dict(best_weights)
     return model, best_val_acc
 
 # CARICAMENTO O TRAIN 
