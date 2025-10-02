@@ -32,47 +32,48 @@ PATIENCE = 3             # Early stopping patience
 
 MIN_DELTA = 1e-4         # miglioramento minimo richiesto sulla val loss
 
+IG_BASELINE_MODE = "dataset_mean"
+
 SAVE_DIR = "rashomon_models"
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 # DATASET 
-transform = transforms.Compose([transforms.ToTensor()])
-mnist_train = datasets.MNIST('.', train=True, download=True, transform=transform)
-mnist_test = datasets.MNIST('.', train=False, download=True, transform=transform)
+train_raw = datasets.MNIST('.', train=True, download=True,
+                           transform=transforms.ToTensor())
 
-# Split: train 80%, val 20% del train originale
+def compute_dataset_stats(ds, batch_size=1024):
+    loader = DataLoader(ds, batch_size=batch_size, shuffle=False)
+    s, ss, n = 0.0, 0.0, 0
+    for x, _ in loader:                     # x: [B,1,28,28] in [0,1]
+        b = x.size(0)
+        x = x.view(b, -1)
+        s  += x.sum().item()
+        ss += (x * x).sum().item()
+        n  += x.numel()
+    mean = s / n
+    var  = ss / n - mean**2
+    std  = var**0.5
+    return float(mean), float(std)
+
+mean, std = compute_dataset_stats(train_raw)
+print(f"MNIST train stats → mean={mean:.6f}, std={std:.6f}")
+
+# trasformazione con Normalize fissata (μ,σ) del TRAIN
+normalize = transforms.Normalize(mean=[mean], std=[std])
+transform = transforms.Compose([transforms.ToTensor(), normalize])
+
+# ricreo i dataset normalizzati (train/test) e poi faccio lo split train/val
+mnist_train = datasets.MNIST('.', train=True,  download=True, transform=transform)
+mnist_test  = datasets.MNIST('.', train=False, download=True, transform=transform)
+
+# split: train 80%, val 20% del train originale (entrambi già normalizzati con gli stessi parametri)
 train_size = int(0.8 * len(mnist_train))
-val_size = len(mnist_train) - train_size
+val_size   = len(mnist_train) - train_size
 train_dataset, val_dataset = random_split(mnist_train, [train_size, val_size])
+
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
-test_loader = DataLoader(mnist_test, batch_size=BATCH_SIZE)
-
-
-# funzione per creare la feature mask per LIME
-def create_feature_mask(patch=4):
-    H = W = 28
-    h_blocks, w_blocks = H // patch, W // patch
-    row_ids = torch.arange(h_blocks).repeat_interleave(patch)
-    col_ids = torch.arange(w_blocks).repeat_interleave(patch)
-    feature_ids = (row_ids.unsqueeze(1) * w_blocks + col_ids).to(dtype=torch.long)
-    return feature_ids.unsqueeze(0).unsqueeze(0)  # [1,1,28,28]
-
-# funzione di valutazione
-def evaluate_accuracy(model, loader, device='cpu'):
-    model = model.to(device)
-    model.eval()
-    correct = total = 0
-    with torch.no_grad():
-        for x, y in loader:
-            x = x.to(device)
-            logits = model(x)
-            pred = logits.argmax(1).cpu()
-            correct += (pred == y).sum().item()
-            total   += y.size(0)
-    return correct / total if total else float('nan')
-
-FEATURE_MASK = create_feature_mask(patch=4)  # patch=4 => 49 feature
+val_loader   = DataLoader(val_dataset,   batch_size=BATCH_SIZE)
+test_loader  = DataLoader(mnist_test,    batch_size=BATCH_SIZE)
 
 # MODELLO 
 class SimpleCNN(nn.Module):
@@ -249,7 +250,13 @@ def generate_saliency(model, sample, label):
 
 def generate_ig(model, sample, label):
     explainer = IntegratedGradients(model)
-    attr = explainer.attribute(sample, target=label, baselines=torch.zeros_like(sample))
+    if IG_BASELINE_MODE == "black":
+        base_val = (0.0 - mean) / (std + 1e-8)  # valore normalizzato del pixel "nero"
+    else:
+        base_val = 0.0                           # baseline = media dataset nello spazio normalizzato
+    baselines = torch.full_like(sample, base_val)
+
+    attr = explainer.attribute(sample, target=label, baselines=baselines)
     arr = attr.squeeze().detach().cpu().numpy()
     arr = (arr - arr.min()) / (arr.max() - arr.min() + 1e-8)
     return arr
@@ -485,6 +492,11 @@ for method in EXPL_METHODS:
 
 
 # VISUALIZZAZIONE
+
+def denorm_img(t):
+    # t shape [1,H,W] o [B,1,H,W]; riporta ai valori [0,1] prima della Normalize
+    return (t * std + mean).clamp(0.0, 1.0)
+
 def plot_explanations_grid(
     explanations_all,
     sample_imgs,
@@ -507,7 +519,7 @@ def plot_explanations_grid(
 
     for i in range(num_imgs):
         # Colonna 0: originale
-        axes[i, 0].imshow(sample_imgs[i][0], cmap='gray')
+        axes[i, 0].imshow(denorm_img(sample_imgs[i])[0], cmap='gray')
         axes[i, 0].axis('off')
         axes[i, 0].set_title(f"Original\nLabel: {sample_labels[i].item()}")
         col = 1
