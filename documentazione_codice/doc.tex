@@ -5,6 +5,8 @@
 \usepackage[italian]{babel}
 \usepackage{csquotes}
 
+\usepackage{verbatim}
+
 \usepackage[a4paper,margin=3cm]{geometry}
 \usepackage{setspace}
 \onehalfspacing  
@@ -49,7 +51,7 @@
 \usepackage[labelfont=bf,font=small]{caption}
 
 \usepackage{amsmath} 
-\usepackage{amssymb} % Needed for \mathbb
+\usepackage{amssymb} % per \mathbb
 \numberwithin{figure}{chapter}
 \numberwithin{table}{chapter}
 
@@ -114,7 +116,7 @@
   \begin{figure}[H]\begin{adjustwidth}{#1}{0pt}\centering}{%
   \end{adjustwidth}\end{figure}}
 
-% --- (Opzionale) Glossario/acronimi ---
+% Glossario/acronimi
 % \usepackage[acronym,toc]{glossaries}
 % \makeglossaries
 
@@ -132,6 +134,7 @@
 
 \begin{abstract}
       \noindent
+      % rivedere definizione di effetto rashomon, anche nelle altre parti in cui viene citato
       \textbf{Background:} Nel machine learning, l’\emph{effetto Rashomon} denota la presenza — per uno stesso compito e lo stesso split dei dati — di molteplici modelli tra loro diversi (architetture, pesi, regole interne) che ottengono prestazioni comparabili; questa molteplicità implica che anche le spiegazioni possano divergere pur a parità di accuratezza.
       \vspace{0.5em}
 
@@ -367,7 +370,7 @@ feature più importanti in 10 step. La baseline di rimpiazzo è stata scelta com
 \textit{media dell’immagine} anziché zeri, per minimizzare il rischio di
 introdurre pattern artificiali fuori distribuzione che avrebbero potuto
 alterare il comportamento del modello \citep{samek2016evaluating}.
-
+% rivedere questa parte, non mi convinvce
 \paragraph{Selezione del Rashomon set.}
 Per ogni inizializzazione (seed) il modello viene addestrato sul
 \textbf{training set} e monitorato sul \textbf{validation set} per
@@ -602,6 +605,15 @@ motivi principali:
 \begin{itemize}
       \item \textbf{Evitare l’overfitting}: interrompendo l’addestramento quando le prestazioni di validazione smettono di migliorare, si evita che il modello memorizzi il training set perdendo capacità di generalizzazione.
       \item \textbf{Equità nel confronto}: applicando la stessa regola a tutti i modelli, ciascun membro del Rashomon set viene selezionato nelle condizioni di miglior equilibrio tra bias e varianza, come raccomandato nelle buone pratiche di confronto tra modelli.
+
+            \begin{comment}
+            \item \textbf{Comparabilità tra modelli}: applicando lo \emph{stesso} criterio a tutti i seed
+            (salvataggio del \emph{best checkpoint} su \emph{validation} e \texttt{patience} uniforme),
+            ogni modello è confrontato nel proprio \emph{punto ottimale in validation}. Il confronto
+            non dipende da un numero di epoche arbitrario ma da una regola uniforme e riproducibile,
+            separata dalla valutazione finale su \emph{test}.
+            \end{comment}
+
 \end{itemize}
 
 Questo approccio assicura che la variabilità osservata nelle spiegazioni non
@@ -611,6 +623,19 @@ componenti stocastiche (inizializzazione dei pesi, shuffle dei dati, generatori
 casuali di librerie esterne) \citep{reimers2017reporting}, è possibile
 distinguere la variabilità dovuta al caso da quella legata a differenze
 strutturali nei modelli o nelle spiegazioni.
+
+\subsection{Normalizzazione stimata su \textit{training}}
+Per prevenire \emph{data leakage}, i parametri di normalizzazione (media e deviazione
+standard) sono stimati \textbf{esclusivamente} sul \textbf{training set} e poi
+riutilizzati \textbf{immutati} su \textbf{validation} e \textbf{test}. Indichiamo con
+$\mu_{\text{train}}$ e $\sigma_{\text{train}}$ (fissate) le statistiche calcolate sul training; la
+trasformazione applicata a \emph{tutte} le immagini (train/val/test) è:
+\[
+      \tilde{x} \;=\; \frac{x - \mu_{\text{train}}}{\sigma_{\text{train}}}.
+\]
+In questo modo, le distribuzioni di validation e test non influenzano in alcun
+modo il preprocessing (nessuna informazione “futura” entra nel training o nella
+selezione dei modelli).
 
 \subsection{Scelta dell’ottimizzatore: Adam.}
 Per l’addestramento di tutte le reti neurali è stato utilizzato l’ottimizzatore
@@ -736,11 +761,12 @@ similarità: dalla struttura globale all’ordine delle feature, fino alla
 corrispondenza numerica esatta \citep{leventi2023consistency,
       samek2016evaluating}.
 
+% forse è meglio farne una discussione più disccorsiva invece di una sezione con una tabella
 \paragraph{Range e interpretazione delle metriche.}
 Per ogni metrica vengono specificati: il \textbf{range teorico}, il
 \textbf{range nel setup} (dopo min–max normalizzazione delle mappe in $[0,1]$),
-la \textbf{direzione di miglioramento} ($\uparrow$ (alto) migliore / $\downarrow$ (basso)
-migliore) e il significato pratico del valore.
+la \textbf{direzione di miglioramento} ($\uparrow$ (alto) migliore /
+$\downarrow$ (basso) migliore) e il significato pratico del valore.
 
 \begin{table}[H]
       \centering
@@ -750,17 +776,17 @@ migliore) e il significato pratico del valore.
             \renewcommand{\arraystretch}{1.15}
             \begin{tabularx}{\linewidth}{l c c c Y}
                   \hline
-                  \textbf{Metrica}  & \textbf{Range teorico} & \textbf{Range setup} & \textbf{Migliore} & \textbf{Interpretazione}                                                                             \\
+                  \textbf{Metrica}  & \textbf{Range teorico} & \textbf{Range setup} & \textbf{Migliore} & \textbf{Interpretazione}                                                                         \\
                   \hline
-                  SSIM              & $[-1,1]$               & $[0,1]$            & $\uparrow$      &
+                  SSIM              & $[-1,1]$               & $[0,1]$              & $\uparrow$        &
                   Somiglianza strutturale (luminanza/contrasto/struttura). Con mappe in $[0,1]$ e \texttt{data\_range=1.0}, valori $\to 1$ indicano pattern quasi identici; $\approx 0$ bassa somiglianza. \\
-                  Pearson ($r$)     & $[-1,1]$               & $[-1,1]$           & $\uparrow$      &
+                  Pearson ($r$)     & $[-1,1]$               & $[-1,1]$             & $\uparrow$        &
                   Correlazione lineare: $1$ = forte accordo, $0$ = nessuna dipendenza, $<0$ = inversione.                                                                                                  \\
-                  Spearman ($\rho$) & $[-1,1]$               & $[-1,1]$           & $\uparrow$      &
+                  Spearman ($\rho$) & $[-1,1]$               & $[-1,1]$             & $\uparrow$        &
                   Correlazione di rango: $1$ stesso ordinamento, $0$ indipendenza, $<0$ ordinamenti opposti.                                                                                               \\
-                  Cosine            & $[-1,1]$               & $[0,1]$            & $\uparrow$      &
+                  Cosine            & $[-1,1]$               & $[0,1]$              & $\uparrow$        &
                   Allineamento direzionale dei vettori: $\to 1$ molto allineati, $\approx 0$ ortogonali. Con mappe non negative i valori sono $\ge 0$.                                                     \\
-                  MAE               & $[0,\infty]$           & $[0,1]$            & $\downarrow$    &
+                  MAE               & $[0,\infty]$           & $[0,1]$              & $\downarrow$      &
                   Differenza media assoluta punto-a-punto: $0$ = mappe identiche.                                                                                                                          \\
                   \hline
             \end{tabularx}
@@ -778,6 +804,7 @@ set e per ogni coppia di spiegazioni, considerando due scenari distinti
 \citep{bhatt2021evaluating, mueller2023rashomon, leventi2023consistency,
       krishna2022disagreement}:
 
+% deve essere più incentrato su inter modello
 \begin{enumerate}
       \item \textbf{Intra-modello} — confronto tra metodi diversi applicati allo stesso modello.
             In questo scenario si misura la coerenza tra approcci di spiegazione differenti:
@@ -1039,6 +1066,7 @@ metodo XAI sia cruciale almeno quanto quella dell’architettura del modello,
 quando l’obiettivo è comprendere le decisioni di un sistema di apprendimento
 automatico.
 
+% da rivedere
 \section{Trade-off tra fedeltà (AOPC) e stabilità (similarità)}
 \label{sec:disc-tradeoff}
 
@@ -1096,6 +1124,7 @@ I risultati suggeriscono che:
             equivalenti possono coesistere.
 \end{enumerate}
 
+% poco significativo
 \section{Limiti e sviluppi futuri}
 Le principali limitazioni riguardano:
 \begin{itemize}
@@ -1111,6 +1140,7 @@ CIFAR-10, ImageNet), il confronto tra architetture differenti, l’inclusione di
 metodi più recenti (Grad-CAM, SHAP) e l’uso di metriche \emph{user-centered}
 per valutare anche l’efficacia comunicativa delle spiegazioni.
 
+% da rivedere
 \chapter*{Conclusioni}
 
 Questo studio ha proposto un approccio sperimentale basato sul \emph{Rashomon
@@ -1138,7 +1168,7 @@ aspetti, ponendo le basi per futuri studi su dataset più complessi,
 architetture eterogenee e metodi di spiegazione avanzati.
 
 \clearpage
-\bibliographystyle{plainnat} % coerente con natbib numeric compressed
+\bibliographystyle{plainnat}
 \bibliography{references}
 
 \end{document}
