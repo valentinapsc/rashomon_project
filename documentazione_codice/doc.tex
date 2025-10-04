@@ -158,21 +158,26 @@
 \newpage
 
 \maketitle
-
 \chapter{Introduzione}
+Quando ci affidiamo ai metodi di spiegazione per modelli di \emph{machine
+      learning}, emerge una domanda: \textit{fissato un metodo di spiegazione, quanto
+      sono \textbf{stabili} (cfr.\ sez.~\ref{sec:stabilita}) le spiegazioni al
+      variare del modello all’interno del \emph{Rashomon set}, e come possiamo
+      quantificarne la \textbf{variabilità}?} La sola accuratezza non basta a
+caratterizzare un sistema di ML: spesso coesistono più modelli con prestazioni
+equivalenti ma comportamenti interni differenti, un fenomeno noto come
+\emph{model multiplicity} \citep{black2022modelmultiplicity}. Tale molteplicità
+può riguardare sia le predizioni (\emph{predictive multiplicity}) sia i
+“processi decisionali” sottostanti (\emph{procedural multiplicity}), di cui le
+spiegazioni XAI offrono una finestra osservativa.
 
-Quando ci affidiamo ai metodi di spiegazione per i modelli di \emph{machine
-      learning}, sorge una domanda cruciale: \textit{fissato un metodo di
-      spiegazione, quanto sono stabili (sez.~\ref{sec:stabilita}) le spiegazioni al
-      variare del modello all’interno del Rashomon set, e come possiamo quantificarne
-      la variabilità?}
-
-Nel contesto del \emph{Rashomon effect}
-\cite{mueller2023rashomon,leventi2023consistency}, in cui coesistono molteplici
-modelli con prestazioni equivalenti ma parametri differenti, questa domanda
-assume un significato ancora più rilevante: se due modelli ottengono lo stesso
-livello di accuratezza, possiamo aspettarci che spieghino le proprie decisioni
-nello stesso modo?
+In questo quadro, viene adottato un \emph{Rashomon set} per isolare l’effetto
+delle scelte di modello a parità di performance e porre la questione centrale
+del \emph{Rashomon effect} \citep{mueller2023rashomon,leventi2023consistency}:
+se due modelli raggiungono lo stesso livello di accuratezza, possiamo
+aspettarci che “spieghino” le proprie decisioni nello stesso modo? La risposta
+a questa domanda si basa sulla misurazione di stabilità e variabilità delle
+spiegazioni con metriche quantitative e valutazioni di fedeltà.
 
 Per affrontare questo problema, si adotta un approccio in tre fasi:
 \begin{enumerate}
@@ -180,18 +185,21 @@ Per affrontare questo problema, si adotta un approccio in tre fasi:
             appartenenti a un \emph{Rashomon set}, e analizzarli con diversi metodi di
             spiegazione.
       \item Applicare più metriche di similarità (ad esempio \emph{Structural Similarity
-                  Index} — SSIM, correlazione di Pearson, similarità coseno, ecc.) alle
-            spiegazioni prodotte.
+                  Index} — SSIM, correlazione di Pearson, correlazione di Spearman, similarità
+            coseno, MAE) alle spiegazioni prodotte.
       \item Confrontare i risultati per capire come varia la spiegazione in funzione sia
-            del modello che del metodo scelto.
+            del modello che del metodo scelto, distinguendo tra scenario
+            \emph{intra-modello} (metodi diversi, stesso modello) e \emph{inter-modello}
+            (stesso metodo, modelli diversi).
 \end{enumerate}
 
 Tuttavia, questo approccio presenta alcune criticità:
 \begin{itemize}
       \item Due metodi di spiegazione, applicati allo stesso input, possono evidenziare
-            regioni o feature completamente diverse come rilevanti.
+            regioni o feature completamente diverse come rilevanti (variabilità
+            \emph{intra-modello}).
       \item Metriche diverse possono portare a conclusioni contrastanti sul grado di
-            similarità.
+            similarità (diverse nozioni di “somiglianza”).
       \item L’assenza di un \emph{ground truth} della “spiegazione corretta” rende
             impossibile dichiarare in assoluto quale metodo sia “migliore”.
 \end{itemize}
@@ -207,18 +215,25 @@ più importanti secondo la spiegazione e si osserva la velocità con cui decresc
 la confidenza del modello. Ad esempio, in un classificatore di immagini, se
 rimuovere la regione indicata come più rilevante provoca un crollo immediato
 della probabilità predetta per la classe corretta, la spiegazione è considerata
-fedele; al contrario, un impatto minimo sulla predizione indicherebbe una
-spiegazione poco utile.
+\emph{fedele}; al contrario, un impatto minimo sulla predizione indicherebbe
+una spiegazione poco utile. La qualità viene riassunta tramite \emph{Area Over
+      the Perturbation Curve} (AOPC).
 
 In letteratura non esiste una metrica unica e definitiva per la valutazione
 delle spiegazioni \cite{adadi2018survey}, ma piuttosto un insieme di
-prospettive complementari. Viene adottata quindi una doppia prospettiva:
+prospettive complementari. In questo lavoro si adotta quindi una doppia
+prospettiva:
 \begin{itemize}
-      \item analisi della \textbf{similarità} tra spiegazioni (intra-modello e
-            inter-modello);
+      \item analisi della \textbf{similarità/stabilità} tra spiegazioni, sia
+            \emph{intra-modello} sia \emph{inter-modello} (sez.~\ref{sec:stabilita});
       \item analisi della \textbf{fedeltà} tramite MoRF e \emph{Area Over the Perturbation
                   Curve} (AOPC).
 \end{itemize}
+
+Questa impostazione rende esplicito come la \textbf{model multiplicity}
+\cite{black2022modelmultiplicity} possa manifestarsi non solo nelle predizioni,
+ma anche nelle \textit{spiegazioni}: modelli equivalenti in accuratezza possono
+produrre attribuzioni tra loro differenti.
 
 \chapter{Introduzione all’implementazione sperimentale}
 
@@ -467,8 +482,12 @@ Per ciascun seed il modello è addestrato sul \textbf{training set} e monitorato
 sul \textbf{validation set} con \emph{early stopping}; si conserva il
 \emph{checkpoint} con la miglior prestazione in validazione (best in
 validation). La costruzione del \emph{Rashomon set} avviene sulla base della
-\textbf{validation accuracy} del checkpoint migliore: si includono tutti i
-modelli entro l’1\% dal migliore, ovvero
+\textbf{validation accuracy} del checkpoint migliore. In linea con le
+raccomandazioni sulla trasparenza nella scelta dei modelli in presenza di
+\emph{model multiplicity} \citep{black2022modelmultiplicity}, rendiamo
+esplicita la \emph{meta-regola} di selezione; si includono nel \emph{Rashomon
+      set} tutti i modelli con \emph{validation accuracy} entro l’1\% dal migliore,
+ovvero
 \[
       \mathrm{Accuracy}_{\mathrm{val}}(m) \;\ge\;
       \mathrm{Accuracy}_{\mathrm{val}}(m_{\mathrm{best}}) - \epsilon
@@ -799,44 +818,36 @@ $\downarrow$ (basso) migliore) e il significato pratico del valore.
 \textit{Nota:} in tutto il lavoro le mappe di attribuzione sono normalizzate in $[0,1]$ prima del calcolo delle metriche; per SSIM viene utilizzato \texttt{data\_range=1.0}. Questo rende i valori tra metodi e modelli comparabili e “lega” MAE all’intervallo $[0,1]$.
 
 \section{Procedura di confronto}
-Il confronto è stato condotto calcolando le metriche per ogni immagine del test
-set e per ogni coppia di spiegazioni, considerando due scenari distinti
-\citep{bhatt2021evaluating, mueller2023rashomon, leventi2023consistency,
-      krishna2022disagreement}:
+Il confronto viene condotto calcolando, per ogni immagine del \textit{test
+      set}, la similarità tra mappe di attribuzione. Il focus principale è lo
+scenario \textbf{inter-modello}, mentre lo scenario \textbf{intra-modello} è
+usato come analisi di controllo.
 
-% deve essere più incentrato su inter modello
-\begin{enumerate}
-      \item \textbf{Intra-modello} — confronto tra metodi diversi applicati allo stesso modello.
-            In questo scenario si misura la coerenza tra approcci di spiegazione differenti:
-            se producono mappe simili, significa che il modello è interpretato in modo coerente
-            indipendentemente dal metodo XAI utilizzato.
+\paragraph{Inter-modello (focus).}
+Fissato un metodo di spiegazione $a$ e un insieme di modelli $\mathcal{M}$
+appartenenti al \emph{Rashomon set}, misuriamo la stabilità del metodo rispetto
+a variazioni nei parametri del modello: per ogni immagine $x$, confrontiamo le
+mappe $E_a(x;m_i)$ e $E_a(x;m_j)$ per tutte le coppie $i<j$, mantenendo
+costanti dati e pipeline di spiegazione.
 
-      \item \textbf{Inter-modello} — confronto dello stesso metodo applicato a modelli diversi
-            appartenenti al \emph{Rashomon set}.
-            Qui si valuta la stabilità del metodo rispetto a variazioni nella struttura interna
-            e nei parametri del modello, mantenendo invariato l’approccio di spiegazione.
-\end{enumerate}
+\paragraph{Intra-modello (controllo).}
+Per completezza, confrontiamo metodi diversi applicati allo \emph{stesso}
+modello. Questo scenario quantifica la coerenza tra approcci XAI differenti
+quando il modello è fissato.
 
-Le attribuzioni sono calcolate sempre rispetto alla \textbf{classe vera}
-(\textit{true label})\footnote{La \emph{true label} è l’etichetta corretta
-      associata a un singolo campione (es. la cifra “5” in un’immagine MNIST). Più in
-      generale, il termine \emph{ground truth} indica il riferimento di verità
-      utilizzato per valutare un modello, che nei problemi di classificazione
-      coincide con le true labels.}. Questa scelta è stata adottata per garantire
-coerenza con il \emph{ground truth} ed evitare che eventuali errori di
-classificazione alterino il confronto. Tuttavia, essa rappresenta una
-potenziale minaccia alla validità esterna: in scenari reali, la classe vera
-potrebbe non essere disponibile e il comportamento del metodo rispetto alla
-classe predetta potrebbe differire in modo significativo.
+\medskip
+Le attribuzioni sono calcolate rispetto alla \textbf{classe vera} (\textit{true label})\footnote{La \emph{true label} è l’etichetta corretta associata al campione. L’uso costante della true label evita che errori di classificazione contaminino il confronto tra mappe; resta tuttavia una potenziale minaccia alla validità esterna in contesti reali in cui la classe predetta sia l’unico riferimento disponibile.}.
 
-\subsection{Definizione operativa di stabilità}
-\label{sec:stabilita}
+\paragraph{Collegamento alla \emph{model multiplicity}.}
+In modo simile a \citet{black2022modelmultiplicity}, che misura la dissonanza tra modelli come \emph{disagreement} atteso sulle predizioni, qui viene quantificata la \textbf{stabilità delle spiegazioni} come \emph{similarità attesa} tra mappe di attribuzione prodotte dallo stesso metodo XAI su modelli diversi del Rashomon set. In altre parole, studiamo la “molteplicità procedurale” a livello di spiegazione, mantenendo costanti dati e accuratezza.
+
+\subsection{Definizione operativa di stabilità} \label{sec:stabilita}
 Viene chiamata \textbf{stabilità} di un metodo di spiegazione la capacità di
 produrre spiegazioni simili al variare di fattori che non dovrebbero alterarne
 il contenuto informativo. In questo lavoro la nozione principale è la
-\emph{stabilità inter-modello}: fissato un metodo
-$a$ e una famiglia di modelli $\mathcal{M}$ con prestazioni equivalenti, le
-spiegazioni $E_a(x;m)$ restano coerenti al variare di $m \in \mathcal{M}$.
+\emph{stabilità inter-modello}: fissato un metodo $a$ e una famiglia di modelli
+$\mathcal{M}$ con prestazioni equivalenti, le spiegazioni $E_a(x;m)$ restano
+coerenti al variare di $m \in \mathcal{M}$.
 
 Operativamente, per ogni immagine $x$ e per ogni coppia di modelli $(m_i,m_j)$
 del Rashomon set, misuriamo una similarità $\mathrm{sim}(\cdot,\cdot)$ (SSIM,
